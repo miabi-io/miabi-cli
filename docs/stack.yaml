@@ -1,0 +1,77 @@
+# Sample miabi.io/v1 stack for `miabi apply`.
+#
+#   miabi apply -f docs/stack.yaml --dry-run    # preview the plan
+#   miabi apply -f docs/stack.yaml              # converge the workspace to it
+#
+# A web app backed by Postgres, with a persistent volume, a generated secret, a
+# domain, and a route. Each document is { apiVersion, kind, metadata, spec }.
+# Resources reference each other by metadata.name. An application's env can
+# interpolate connection details and secrets:
+#   {{ .databases.<name>.uri | .host | .port | .user | .password | .name }}
+#   {{ .secrets.<name> }}
+# (Use underscore/simple names for anything referenced this way — dotted
+# template access does not allow hyphens.)
+---
+apiVersion: miabi.io/v1
+kind: Volume
+metadata:
+  name: web-data
+spec:
+  size: 5Gi
+---
+apiVersion: miabi.io/v1
+kind: Secret
+metadata:
+  name: appkey
+spec:
+  generate: true # the server generates a strong value; it is never sent or stored by the client
+  length: 48
+---
+apiVersion: miabi.io/v1
+kind: Database
+metadata:
+  name: db
+spec:
+  engine: postgres
+  version: "17-alpine"
+  placement: auto # reuse a compatible instance if present, else provision a dedicated one
+---
+apiVersion: miabi.io/v1
+kind: Application
+metadata:
+  name: web
+spec:
+  image: ghcr.io/org/web
+  tag: "1.4.0"
+  ports:
+    - container: 8080
+      scheme: http
+  env:
+    APP_ENV: production
+    DATABASE_URL: "{{ .databases.db.uri }}"
+    APP_KEY: "{{ .secrets.appkey }}"
+  secretEnv: # env keys to encrypt at rest (each must also appear in env above)
+    - DATABASE_URL
+    - APP_KEY
+  mounts:
+    - volume: web-data
+      path: /data
+---
+apiVersion: miabi.io/v1
+kind: Domain
+metadata:
+  name: example.com
+spec:
+  tls: acme
+---
+apiVersion: miabi.io/v1
+kind: Route
+metadata:
+  name: web
+spec:
+  hosts: # one route can answer on several hostnames
+    - example.com
+    - www.example.com
+  app: web
+  port: 8080
+  tls: acme

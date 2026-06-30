@@ -1,0 +1,47 @@
+# GoReleaser config for the miabi CLI.
+# Release:  goreleaser release --clean   (on a tag)
+# Snapshot: goreleaser build --snapshot --clean
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: miabi
+    main: .
+    binary: miabi
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X github.com/miabi-io/miabi-cli/internal/cmd.version={{ .Version }}
+
+archives:
+  - id: miabi
+    name_template: "miabi_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-dev"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+release:
+  github:
+    owner: miabi-io
+    name: miabi-cli
