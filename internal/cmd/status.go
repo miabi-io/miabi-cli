@@ -2,28 +2,25 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/miabi-io/miabi-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
-var (
-	statusApp        string
-	statusDeployment uint
-)
+var statusDeployment int
 
 func init() {
-	f := statusCmd.Flags()
-	f.StringVar(&statusApp, "app", "", "application slug or id (required)")
-	f.UintVar(&statusDeployment, "deployment", 0, "a specific deployment id (default: the app's current status)")
-	_ = statusCmd.MarkFlagRequired("app")
-	rootCmd.AddCommand(statusCmd)
+	statusCmd.Flags().IntVar(&statusDeployment, "deployment", 0, "show a specific deployment's status by its number")
+	statusCmd.ValidArgsFunction = completeApps
+	appCmd.AddCommand(statusCmd)
 }
 
 var statusCmd = &cobra.Command{
-	Use:   "status --app <slug> [--deployment <id>]",
-	Short: "Show an application's status, or a specific deployment's status",
-	RunE: func(cmd *cobra.Command, _ []string) error {
+	Use:     "status [app] [--deployment <number>]",
+	Short:   "Show an application's status, or a specific deployment's status",
+	Example: "  miabi apps status web\n  miabi apps status web --deployment 7",
+	Args:    cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 		c, eff, err := newClient()
 		if err != nil {
@@ -33,22 +30,25 @@ var statusCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		appID, err := c.ResolveAppID(ctx, ws, statusApp)
+		appID, appRef, err := resolveAppRef(ctx, c, eff, ws, appArg(args))
 		if err != nil {
 			return err
 		}
 
 		if statusDeployment != 0 {
-			dep, err := c.Deployment(ctx, ws, appID, statusDeployment)
+			dep, err := c.DeploymentByNumber(ctx, ws, appID, statusDeployment)
 			if err != nil {
 				return err
 			}
-			if flagJSON {
-				return printJSON(dep)
+			if structured() {
+				return emit(dep)
 			}
-			fmt.Printf("Deployment #%d: %s\n", dep.ID, dep.Status)
+			ui.Info("Deployment #%d: %s", dep.Number, ui.Status(dep.Status))
+			if dep.Image != "" {
+				ui.Info("Image: %s", dep.Image)
+			}
 			if dep.Error != "" {
-				fmt.Printf("Error: %s\n", dep.Error)
+				ui.Fail("Error: %s", dep.Error)
 			}
 			return nil
 		}
@@ -57,10 +57,11 @@ var statusCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if flagJSON {
-			return printJSON(app)
+		if structured() {
+			return emit(app)
 		}
-		fmt.Printf("%s (%s): %s — %s:%s\n", app.Name, app.Slug, app.Status, app.Image, app.Tag)
+		ui.Info("%s (%s): %s", ui.Bold(app.Name), appRef, ui.Status(app.Status))
+		ui.Info("Image: %s:%s", app.Image, app.Tag)
 		return nil
 	},
 }

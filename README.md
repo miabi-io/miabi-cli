@@ -1,7 +1,7 @@
 # miabi CLI
 
 The imperative client for a [Miabi](https://github.com/miabi-io/miabi) control panel.
-Drive the deploy flow from a terminal or CI — `miabi deploy --app web --tag $SHA --wait`
+Drive the deploy flow from a terminal or CI — `miabi apps deploy web --tag $SHA --wait`
 updates the image, deploys, blocks until the deployment is terminal, and **exits
 non‑zero on failure**.
 
@@ -31,7 +31,7 @@ miabi --version
 **Docker** (GitHub Container Registry):
 
 ```bash
-docker run --rm -e MIABI_URL -e MIABI_TOKEN ghcr.io/miabi-io/miabi-cli:latest whoami
+docker run --rm -e MIABI_URL -e MIABI_TOKEN miabi/miabi-cli:latest whoami
 ```
 
 ## Authenticate
@@ -59,20 +59,58 @@ workspace:
 
 ## Commands
 
+Every app command lives under `apps` and takes the app as its **first
+argument** — or you can bind a default once with `miabi use <app>` and omit it:
+
 ```
-miabi whoami                       # identity, scopes, bound workspace
+miabi whoami                       # identity, scopes, active workspace + app
 miabi workspace list|show|switch   # set the active workspace context
-miabi apps                         # list applications
-miabi deploy   --app web --tag $SHA [--strategy rolling] [--wait] [--timeout 10m]
-miabi status   --app web [--deployment 123]
-miabi logs     --app web --deployment 123 [--follow]
-miabi releases --app web
-miabi rollback --app web (--release 12 | --to-previous)
-miabi env set    --app web KEY=VALUE [--secret]
-miabi env import --app web --file .env [--secret]
+miabi use web                      # bind a default app (per workspace)
+
+miabi apps ls                      # list applications (→ marks the bound app)
+miabi apps create web (--image ghcr.io/acme/web [--tag 1.0] | --git-repo <url> [--git-ref main]) [--port 3000] [--use]
+miabi apps deploy      [web] --tag $SHA [--strategy rolling] [--wait] [--timeout 10m]
+miabi apps start|stop|restart [web]               # control the app's container
+miabi apps deployments [web]                      # deploy history — the NUMBER column
+miabi apps logs        [web] [--follow] [--tail 200]      # current logs (‑‑follow to stream)
+miabi apps logs        [web] --deployment 7               # a deployment's build logs
+miabi apps status      [web] [--deployment 7]
+miabi apps releases    [web]
+miabi apps rollback    [web] (--to <version> | --to-previous) [--yes]
+miabi apps env set     [web] KEY=VALUE [--secret]
+miabi apps env import  [web] --file .env [--secret]
+
 miabi apply  -f stack.yaml [--prune] [--dry-run]  # declarative: converge to a manifest bundle
 miabi delete -f stack.yaml [--dry-run]            # delete exactly the resources the bundle names
 ```
+
+### Databases
+
+Managed database instances (PostgreSQL, MySQL, MariaDB, Redis, MongoDB, libSQL)
+and the logical databases hosted on them. Instances are addressed by **slug**
+(or numeric id):
+
+```
+miabi db ls                                   # list instances
+miabi db engines                              # engines + default versions
+miabi db create shop --engine postgres [--version 16] [--size-mb 2048] [--node <id>]
+miabi db get shop
+miabi db start|stop|restart shop
+miabi db logs shop [--follow] [--tail 200]
+miabi db credentials shop                     # reveal admin connection (admin)
+miabi db upgrade shop --to 17 [--stop-apps]
+miabi db rm shop [--yes]
+# logical databases on an instance:
+miabi db databases shop                       # list
+miabi db databases create shop app_prod [--app web]   # optionally attach to an app
+miabi db databases connection shop app_prod   # reveal connection (admin)
+miabi db databases rm shop app_prod [--yes]
+```
+
+`[web]` is optional when an app is bound with `miabi use`. Deployments and
+releases are addressed by their **per-app number/version** (the `NUMBER` /
+`VERSION` columns), not the global platform id. Shell completion (`miabi
+completion <shell>`) tab-completes app slugs.
 
 ### Declarative apply
 
@@ -104,9 +142,11 @@ Kinds: `Application`, `Stack`, `Database`, `Volume`, `Secret`, `Route`, `Domain`
 hyphen-free name for anything referenced via dotted `{{ .secrets.<name> }}` /
 `{{ .databases.<name>.* }}` interpolation.
 
-- `--app` takes a **slug** (or numeric id); the workspace comes from `--workspace`,
-  the active workspace, or a workspace‑bound token.
-- `--json` on read commands gives `jq`‑friendly output; human tables otherwise.
+- The app argument is a **slug** (or numeric id); the workspace comes from
+  `--workspace`, the active workspace, or a workspace‑bound token.
+- `-o json|yaml` (or the `--json` shorthand) gives `jq`/`yq`‑friendly output;
+  human tables otherwise. Color auto‑disables off a TTY, with `--no-color`, or
+  when `NO_COLOR` is set.
 - `--verbose` logs every HTTP request to stderr.
 
 ## CI example (GitHub Actions)
@@ -114,7 +154,7 @@ hyphen-free name for anything referenced via dotted `{{ .secrets.<name> }}` /
 ```yaml
 - run: |
     go install github.com/miabi-io/miabi-cli@latest
-    miabi deploy --app web --tag "${{ github.sha }}" --wait
+    miabi apps deploy web --tag "${{ github.sha }}" --wait
   env:
     MIABI_URL:   ${{ vars.MIABI_URL }}
     MIABI_TOKEN: ${{ secrets.MIABI_DEPLOY_TOKEN }}

@@ -3,11 +3,10 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
-	"text/tabwriter"
 
 	"github.com/miabi-io/miabi-cli/internal/config"
+	"github.com/miabi-io/miabi-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -34,15 +33,23 @@ var workspaceListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if flagJSON {
-			return printJSON(ws)
+		if structured() {
+			return emit(ws)
 		}
-		tw := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-		fmt.Fprintln(tw, "ID\tNAME\tDISPLAY NAME\tROLE")
+		active := ""
+		if f, ferr := config.Load(); ferr == nil && f.Workspace != nil {
+			active = f.Workspace.Name
+		}
+		t := ui.NewTable("", "NAME", "DISPLAY NAME", "ROLE")
 		for _, w := range ws {
-			fmt.Fprintf(tw, "%d\t%s\t%s\t%s\n", w.ID, w.Name, w.DisplayName, w.Role)
+			marker := " "
+			if w.Name == active {
+				marker = ui.Cyan("→")
+			}
+			t.Row(marker, w.Name, w.DisplayName, w.Role)
 		}
-		return tw.Flush()
+		t.Print()
+		return nil
 	},
 }
 
@@ -58,14 +65,17 @@ var workspaceShowCmd = &cobra.Command{
 			fmt.Println("No active workspace. Set one with `miabi workspace switch <name>`.")
 			return nil
 		}
-		if flagJSON {
-			return printJSON(f.Workspace)
+		if structured() {
+			return emit(f.Workspace)
 		}
 		label := f.Workspace.Name
 		if f.Workspace.DisplayName != "" {
 			label = fmt.Sprintf("%s (%s)", f.Workspace.DisplayName, f.Workspace.Name)
 		}
-		fmt.Printf("Active workspace: %s [id %d]\n", label, f.Workspace.ID)
+		ui.Info("Active workspace: %s", ui.Bold(label))
+		if f.App != nil {
+			ui.Info("Current app: %s", ui.Bold(f.App.Name))
+		}
 		return nil
 	},
 }
@@ -92,6 +102,9 @@ var workspaceSwitchCmd = &cobra.Command{
 					return err
 				}
 				f.Workspace = &config.WorkspaceRef{ID: w.ID, Name: w.Name, DisplayName: w.DisplayName}
+				// The bound app belongs to the old workspace — clear it so a stale
+				// app never leaks across a workspace switch.
+				f.App = nil
 				if err := config.Save(f); err != nil {
 					return err
 				}

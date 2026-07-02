@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/miabi-io/miabi-cli/internal/config"
+	"github.com/miabi-io/miabi-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -58,19 +59,25 @@ var whoamiCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if flagJSON {
-			return printJSON(me)
+		if structured() {
+			return emit(me)
 		}
-		fmt.Printf("User:    %s <%s>\n", me.Name, me.Email)
+		fmt.Printf("%s   %s <%s>\n", ui.Dim("User: "), me.Name, me.Email)
 		if me.Username != "" {
-			fmt.Printf("Username: %s\n", me.Username)
+			fmt.Printf("%s   @%s\n", ui.Dim("Name: "), me.Username)
 		}
-		fmt.Printf("Auth:    %s\n", me.Auth.Method)
+		fmt.Printf("%s   %s\n", ui.Dim("Auth: "), me.Auth.Method)
 		if len(me.Auth.Scopes) > 0 {
-			fmt.Printf("Scopes:  %s\n", strings.Join(me.Auth.Scopes, ", "))
+			fmt.Printf("%s %s\n", ui.Dim("Scopes:"), strings.Join(me.Auth.Scopes, ", "))
 		}
-		if me.Auth.WorkspaceID != nil {
-			fmt.Printf("Bound workspace: %d\n", *me.Auth.WorkspaceID)
+		// Local context (workspace + bound app) from the config file.
+		if f, ferr := config.Load(); ferr == nil {
+			if f.Workspace != nil {
+				fmt.Printf("%s    %s\n", ui.Dim("Space:"), f.Workspace.Name)
+			}
+			if f.App != nil {
+				fmt.Printf("%s      %s\n", ui.Dim("App:"), f.App.Name)
+			}
 		}
 		return nil
 	},

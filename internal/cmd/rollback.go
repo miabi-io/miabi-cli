@@ -5,31 +5,34 @@ import (
 	"fmt"
 
 	"github.com/miabi-io/miabi-cli/internal/api"
+	"github.com/miabi-io/miabi-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
 var (
-	rollbackApp        string
-	rollbackRelease    uint
+	rollbackTo         int
 	rollbackToPrevious bool
+	rollbackYes        bool
 )
 
 func init() {
 	f := rollbackCmd.Flags()
-	f.StringVar(&rollbackApp, "app", "", "application slug or id (required)")
-	f.UintVar(&rollbackRelease, "release", 0, "release id to roll back to")
+	f.IntVar(&rollbackTo, "to", 0, "release version to roll back to (see `miabi releases`)")
 	f.BoolVar(&rollbackToPrevious, "to-previous", false, "roll back to the most recent inactive release")
-	_ = rollbackCmd.MarkFlagRequired("app")
-	rootCmd.AddCommand(rollbackCmd)
+	f.BoolVarP(&rollbackYes, "yes", "y", false, "skip the confirmation prompt")
+	rollbackCmd.ValidArgsFunction = completeApps
+	appCmd.AddCommand(rollbackCmd)
 }
 
 var rollbackCmd = &cobra.Command{
-	Use:   "rollback --app <slug> (--release <id> | --to-previous)",
-	Short: "Roll an application back to a previous release",
-	RunE: func(cmd *cobra.Command, _ []string) error {
+	Use:     "rollback [app] (--to <version> | --to-previous)",
+	Short:   "Roll an application back to a previous release",
+	Example: "  miabi apps rollback web --to-previous\n  miabi apps rollback web --to 4",
+	Args:    cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		if rollbackRelease == 0 && !rollbackToPrevious {
-			return fmt.Errorf("specify --release <id> or --to-previous")
+		if rollbackTo == 0 && !rollbackToPrevious {
+			return fmt.Errorf("specify --to <version> or --to-previous")
 		}
 		c, eff, err := newClient()
 		if err != nil {
@@ -39,12 +42,14 @@ var rollbackCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		appID, err := c.ResolveAppID(ctx, ws, rollbackApp)
+		appID, appRef, err := resolveAppRef(ctx, c, eff, ws, appArg(args))
 		if err != nil {
 			return err
 		}
 
-		target := rollbackRelease
+		// Resolve the target release id and version for display.
+		var targetID uint
+		var targetVersion int
 		if rollbackToPrevious {
 			rels, err := c.Releases(ctx, ws, appID)
 			if err != nil {
@@ -54,23 +59,36 @@ var rollbackCmd = &cobra.Command{
 			// one that is not currently active.
 			for _, r := range rels {
 				if !r.Active {
-					target = r.ID
+					targetID, targetVersion = r.ID, r.Version
 					break
 				}
 			}
-			if target == 0 {
+			if targetID == 0 {
 				return fmt.Errorf("no previous release to roll back to")
+			}
+		} else {
+			rel, err := c.ReleaseByVersion(ctx, ws, appID, rollbackTo)
+			if err != nil {
+				return err
+			}
+			targetID, targetVersion = rel.ID, rel.Version
+		}
+
+		if !rollbackYes && !structured() {
+			if !ui.Confirm(fmt.Sprintf("Roll %s back to release v%d?", ui.Bold(appRef), targetVersion)) {
+				ui.Info("Aborted")
+				return nil
 			}
 		}
 
-		dep, err := c.Rollback(ctx, ws, appID, api.RollbackRequest{ReleaseID: target})
+		dep, err := c.Rollback(ctx, ws, appID, api.RollbackRequest{ReleaseID: targetID})
 		if err != nil {
 			return err
 		}
-		if flagJSON {
-			return printJSON(dep)
+		if structured() {
+			return emit(dep)
 		}
-		fmt.Printf("Rollback to release %d started (deployment #%d, status: %s)\n", target, dep.ID, dep.Status)
+		ui.Success("Rolling %s back to v%d (deployment #%d, %s)", ui.Bold(appRef), targetVersion, dep.Number, ui.Status(dep.Status))
 		return nil
 	},
 }

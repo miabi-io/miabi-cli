@@ -54,8 +54,8 @@ var applyCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			if flagJSON {
-				return printJSON(plan)
+			if structured() {
+				return emit(plan)
 			}
 			printChanges(plan.Changes)
 			fmt.Println("\n(dry run — nothing was applied)")
@@ -66,8 +66,8 @@ var applyCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if flagJSON {
-			_ = printJSON(res)
+		if structured() {
+			_ = emit(res)
 		} else {
 			if res.Plan != nil {
 				printChanges(res.Plan.Changes)

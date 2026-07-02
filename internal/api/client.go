@@ -116,7 +116,11 @@ func (c *Client) put(ctx context.Context, path string, body, out any) error {
 	return c.do(rb, out)
 }
 
-// --- identity & workspaces -------------------------------------------------
+func (c *Client) del(ctx context.Context, path string, out any) error {
+	return c.do(c.c.Delete(path).WithContext(ctx), out)
+}
+
+// === identity & workspaces ===================================
 
 func (c *Client) Me(ctx context.Context) (*Me, error) {
 	var m Me
@@ -161,7 +165,7 @@ func (c *Client) ResolveWorkspaceName(ctx context.Context, ref, fallback string)
 	return "", fmt.Errorf("workspace %q not found among your workspaces", ref)
 }
 
-// --- applications ----------------------------------------------------------
+// ======== applications ===================================
 
 func (c *Client) Apps(ctx context.Context, ws string) ([]App, error) {
 	var apps []App
@@ -173,7 +177,12 @@ func (c *Client) App(ctx context.Context, ws string, appID uint) (*App, error) {
 	return &a, c.get(ctx, fmt.Sprintf("/api/v1/workspaces/%s/apps/%d", ws, appID), &a)
 }
 
-// ResolveAppID turns an app slug (or numeric id) into the numeric id paths use.
+func (c *Client) CreateApp(ctx context.Context, ws string, req CreateAppRequest) (*App, error) {
+	var a App
+	return &a, c.post(ctx, fmt.Sprintf("/api/v1/workspaces/%s/apps", ws), req, &a)
+}
+
+// ResolveAppID turns an app handle (or numeric id) into the numeric id paths use.
 func (c *Client) ResolveAppID(ctx context.Context, ws string, ref string) (uint, error) {
 	if id, err := strconv.ParseUint(ref, 10, 64); err == nil {
 		return uint(id), nil
@@ -183,7 +192,7 @@ func (c *Client) ResolveAppID(ctx context.Context, ws string, ref string) (uint,
 		return 0, err
 	}
 	for _, a := range apps {
-		if a.Slug == ref {
+		if a.Name == ref {
 			return a.ID, nil
 		}
 	}
@@ -195,6 +204,21 @@ func (c *Client) ResolveAppID(ctx context.Context, ws string, ref string) (uint,
 func (c *Client) Deploy(ctx context.Context, ws string, appID uint, req DeployRequest) (*Deployment, error) {
 	var d Deployment
 	return &d, c.post(ctx, fmt.Sprintf("/api/v1/workspaces/%s/apps/%d/deploy", ws, appID), req, &d)
+}
+
+// appAction posts to an app lifecycle sub-path (start|stop|restart).
+func (c *Client) appAction(ctx context.Context, ws string, appID uint, action string) error {
+	return c.post(ctx, fmt.Sprintf("/api/v1/workspaces/%s/apps/%d/%s", ws, appID, action), nil, nil)
+}
+
+func (c *Client) StartApp(ctx context.Context, ws string, appID uint) error {
+	return c.appAction(ctx, ws, appID, "start")
+}
+func (c *Client) StopApp(ctx context.Context, ws string, appID uint) error {
+	return c.appAction(ctx, ws, appID, "stop")
+}
+func (c *Client) RestartApp(ctx context.Context, ws string, appID uint) error {
+	return c.appAction(ctx, ws, appID, "restart")
 }
 
 func (c *Client) Rollback(ctx context.Context, ws string, appID uint, req RollbackRequest) (*Deployment, error) {
@@ -222,9 +246,128 @@ func (c *Client) Deployment(ctx context.Context, ws string, appID, depID uint) (
 	return nil, fmt.Errorf("deployment #%d not found", depID)
 }
 
+// DeploymentByNumber resolves a per-application deployment number (the value
+// users pass) to the full deployment, whose durable ID API paths address by.
+func (c *Client) DeploymentByNumber(ctx context.Context, ws string, appID uint, number int) (*Deployment, error) {
+	deps, err := c.Deployments(ctx, ws, appID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range deps {
+		if deps[i].Number == number {
+			return &deps[i], nil
+		}
+	}
+	return nil, fmt.Errorf("deployment #%d not found for this app", number)
+}
+
+// ReleaseByVersion resolves a per-application release version to the full
+// release (the ID is what the rollback API expects).
+func (c *Client) ReleaseByVersion(ctx context.Context, ws string, appID uint, version int) (*Release, error) {
+	rels, err := c.Releases(ctx, ws, appID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range rels {
+		if rels[i].Version == version {
+			return &rels[i], nil
+		}
+	}
+	return nil, fmt.Errorf("release v%d not found for this app", version)
+}
+
 func (c *Client) Releases(ctx context.Context, ws string, appID uint) ([]Release, error) {
 	var rs []Release
 	return rs, c.get(ctx, fmt.Sprintf("/api/v1/workspaces/%s/apps/%d/releases", ws, appID), &rs)
+}
+
+// --- databases -------------------------------------------------------------
+
+func (c *Client) Databases(ctx context.Context, ws string) ([]DatabaseInstance, error) {
+	var dbs []DatabaseInstance
+	return dbs, c.get(ctx, fmt.Sprintf("/api/v1/workspaces/%s/databases", ws), &dbs)
+}
+
+func (c *Client) Database(ctx context.Context, ws string, id uint) (*DatabaseInstance, error) {
+	var d DatabaseInstance
+	return &d, c.get(ctx, fmt.Sprintf("/api/v1/workspaces/%s/databases/%d", ws, id), &d)
+}
+
+// ResolveDatabaseID turns a database handle (or numeric id) into the numeric id.
+func (c *Client) ResolveDatabaseID(ctx context.Context, ws, ref string) (uint, error) {
+	if id, err := strconv.ParseUint(ref, 10, 64); err == nil {
+		return uint(id), nil
+	}
+	dbs, err := c.Databases(ctx, ws)
+	if err != nil {
+		return 0, err
+	}
+	for _, d := range dbs {
+		if d.Name == ref {
+			return d.ID, nil
+		}
+	}
+	return 0, fmt.Errorf("database %q not found in this workspace", ref)
+}
+
+func (c *Client) DatabaseEngines(ctx context.Context, ws string) ([]EngineDefault, error) {
+	var e []EngineDefault
+	return e, c.get(ctx, fmt.Sprintf("/api/v1/workspaces/%s/database-engines", ws), &e)
+}
+
+func (c *Client) CreateDatabase(ctx context.Context, ws string, req CreateDatabaseRequest) (*DatabaseInstance, error) {
+	var d DatabaseInstance
+	return &d, c.post(ctx, fmt.Sprintf("/api/v1/workspaces/%s/databases", ws), req, &d)
+}
+
+// dbAction posts to a lifecycle sub-path (start|stop|restart) that returns a message.
+func (c *Client) dbAction(ctx context.Context, ws string, id uint, action string) error {
+	return c.post(ctx, fmt.Sprintf("/api/v1/workspaces/%s/databases/%d/%s", ws, id, action), nil, nil)
+}
+
+func (c *Client) StartDatabase(ctx context.Context, ws string, id uint) error {
+	return c.dbAction(ctx, ws, id, "start")
+}
+func (c *Client) StopDatabase(ctx context.Context, ws string, id uint) error {
+	return c.dbAction(ctx, ws, id, "stop")
+}
+func (c *Client) RestartDatabase(ctx context.Context, ws string, id uint) error {
+	return c.dbAction(ctx, ws, id, "restart")
+}
+
+func (c *Client) DeleteDatabaseInstance(ctx context.Context, ws string, id uint) error {
+	return c.del(ctx, fmt.Sprintf("/api/v1/workspaces/%s/databases/%d", ws, id), nil)
+}
+
+func (c *Client) DatabaseCredentials(ctx context.Context, ws string, id uint) (*ConnectionInfo, error) {
+	var info ConnectionInfo
+	return &info, c.get(ctx, fmt.Sprintf("/api/v1/workspaces/%s/databases/%d/credentials", ws, id), &info)
+}
+
+func (c *Client) UpgradeDatabase(ctx context.Context, ws string, id uint, req UpgradeDatabaseRequest) (*DatabaseInstance, error) {
+	var d DatabaseInstance
+	return &d, c.post(ctx, fmt.Sprintf("/api/v1/workspaces/%s/databases/%d/upgrade", ws, id), req, &d)
+}
+
+// Logical databases hosted on an instance.
+
+func (c *Client) LogicalDatabases(ctx context.Context, ws string, id uint) ([]LogicalDatabase, error) {
+	var dbs []LogicalDatabase
+	return dbs, c.get(ctx, fmt.Sprintf("/api/v1/workspaces/%s/databases/%d/databases", ws, id), &dbs)
+}
+
+func (c *Client) CreateLogicalDatabase(ctx context.Context, ws string, id uint, req CreateLogicalDatabaseRequest) (*CreateLogicalDatabaseResult, error) {
+	var r CreateLogicalDatabaseResult
+	return &r, c.post(ctx, fmt.Sprintf("/api/v1/workspaces/%s/databases/%d/databases", ws, id), req, &r)
+}
+
+func (c *Client) LogicalDatabaseConnection(ctx context.Context, ws string, id, dbID uint) (*ConnectionInfo, error) {
+	var info ConnectionInfo
+	return &info, c.get(ctx, fmt.Sprintf("/api/v1/workspaces/%s/databases/%d/databases/%d/connection", ws, id, dbID), &info)
+}
+
+func (c *Client) DeleteLogicalDatabase(ctx context.Context, ws string, id, dbID uint) error {
+	return c.del(ctx, fmt.Sprintf("/api/v1/workspaces/%s/databases/%d/databases/%d", ws, id, dbID), nil)
 }
 
 // --- env -------------------------------------------------------------------
@@ -237,7 +380,7 @@ func (c *Client) ImportEnv(ctx context.Context, ws string, appID uint, req Impor
 	return c.post(ctx, fmt.Sprintf("/api/v1/workspaces/%s/apps/%d/env/import", ws, appID), req, nil)
 }
 
-// ========= declarative apply -----------------------------------------------------
+// ========= declarative apply ===================================
 
 // PlanApply previews converging the workspace to the manifest bundle (dry-run).
 func (c *Client) PlanApply(ctx context.Context, ws string, manifests string, prune bool) (*Plan, error) {
