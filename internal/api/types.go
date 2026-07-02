@@ -43,9 +43,27 @@ type App struct {
 	CurrentReleaseID *uint  `json:"current_release_id"`
 }
 
+// CreateAppRequest is the body of POST .../apps (only the common fields the CLI
+// exposes). SourceType is "image" or "git"; the CLI infers it from the flags.
+type CreateAppRequest struct {
+	Name        string   `json:"name"`
+	ServerID    uint     `json:"server_id,omitempty"`
+	SourceType  string   `json:"source_type,omitempty"`
+	Image       string   `json:"image,omitempty"`
+	Tag         string   `json:"tag,omitempty"`
+	GitRepo     string   `json:"git_repo,omitempty"`
+	GitRef      string   `json:"git_ref,omitempty"`
+	BuildMethod string   `json:"build_method,omitempty"`
+	Port        int      `json:"port,omitempty"`
+	Command     []string `json:"command,omitempty"`
+}
+
 // Deployment is the deploy/rollback response and status object.
 type Deployment struct {
-	ID            uint       `json:"id"`
+	ID uint `json:"id"`
+	// Number is the per-application deployment number (1, 2, 3…) users address
+	// deployments by; ID is the durable platform-wide key used in API paths.
+	Number        int        `json:"number"`
 	ApplicationID uint       `json:"application_id"`
 	Status        string     `json:"status"`
 	Image         string     `json:"image"`
@@ -55,6 +73,8 @@ type Deployment struct {
 	StartedAt     *time.Time `json:"started_at"`
 	FinishedAt    *time.Time `json:"finished_at"`
 	CreatedAt     time.Time  `json:"created_at"`
+	// Current marks the deployment whose release is live right now.
+	Current bool `json:"current"`
 }
 
 // Release is one immutable release of an app.
@@ -115,6 +135,83 @@ type SetEnvRequest struct {
 type ImportEnvRequest struct {
 	Content  string `json:"content"`
 	IsSecret bool   `json:"is_secret"`
+}
+
+// === databases ============================================================
+
+// DatabaseInstance is a managed database server (only the fields the CLI shows).
+type DatabaseInstance struct {
+	ID          uint      `json:"id"`
+	Slug        string    `json:"slug"`
+	Name        string    `json:"name"`
+	Engine      string    `json:"engine"`
+	Version     string    `json:"version"`
+	Status      string    `json:"status"`
+	ServerID    uint      `json:"server_id"`
+	ServerName  string    `json:"server_name,omitempty"`
+	Host        string    `json:"host"`
+	Port        int       `json:"port"`
+	AdminUser   string    `json:"admin_user"`
+	SizeBytes   int64     `json:"size_bytes,omitempty"`
+	NetworkName string    `json:"network_name,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// LogicalDatabase is a database hosted on an instance (SQL engines).
+type LogicalDatabase struct {
+	ID            uint      `json:"id"`
+	InstanceID    uint      `json:"instance_id"`
+	Name          string    `json:"name"`
+	Username      string    `json:"username"`
+	Status        string    `json:"status"`
+	ApplicationID *uint     `json:"application_id"`
+	EnvPrefix     string    `json:"env_prefix,omitempty"`
+	SizeBytes     int64     `json:"size_bytes,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+// ConnectionInfo is a revealed database connection (admin credentials / DSN).
+type ConnectionInfo struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Database string `json:"database"`
+	URI      string `json:"uri"`
+}
+
+// EngineDefault is one entry of GET /database-engines.
+type EngineDefault struct {
+	Engine  string `json:"engine"`
+	Image   string `json:"image"`
+	Version string `json:"version"`
+}
+
+// CreateDatabaseRequest is the body of POST .../databases.
+type CreateDatabaseRequest struct {
+	Name     string `json:"name"`
+	Engine   string `json:"engine"`
+	Version  string `json:"version,omitempty"`
+	ServerID uint   `json:"server_id,omitempty"`
+	SizeMB   int    `json:"size_mb,omitempty"`
+}
+
+// UpgradeDatabaseRequest is the body of POST .../databases/{id}/upgrade.
+type UpgradeDatabaseRequest struct {
+	Version  string `json:"version"`
+	StopApps bool   `json:"stop_apps,omitempty"`
+}
+
+// CreateLogicalDatabaseRequest is the body of POST .../databases/{id}/databases.
+type CreateLogicalDatabaseRequest struct {
+	Name          string `json:"name"`
+	ApplicationID *uint  `json:"application_id"`
+}
+
+// CreateLogicalDatabaseResult is the create-logical-database response.
+type CreateLogicalDatabaseResult struct {
+	Database    LogicalDatabase `json:"database"`
+	EnvInjected bool            `json:"env_injected"`
 }
 
 // ApplyRequest is the body of POST .../apply — a miabi.io/v1 manifest bundle and

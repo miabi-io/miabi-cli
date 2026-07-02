@@ -2,25 +2,22 @@ package cmd
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"text/tabwriter"
 
+	"github.com/miabi-io/miabi-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
-var releasesApp string
-
 func init() {
-	releasesCmd.Flags().StringVar(&releasesApp, "app", "", "application slug or id (required)")
-	_ = releasesCmd.MarkFlagRequired("app")
-	rootCmd.AddCommand(releasesCmd)
+	releasesCmd.ValidArgsFunction = completeApps
+	appCmd.AddCommand(releasesCmd)
 }
 
 var releasesCmd = &cobra.Command{
-	Use:   "releases --app <slug>",
-	Short: "List an application's releases (newest first)",
-	RunE: func(cmd *cobra.Command, _ []string) error {
+	Use:     "releases [app]",
+	Short:   "List an application's releases (newest first)",
+	Example: "  miabi apps releases web\n  miabi apps releases       # the bound app",
+	Args:    cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 		c, eff, err := newClient()
 		if err != nil {
@@ -30,7 +27,7 @@ var releasesCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		appID, err := c.ResolveAppID(ctx, ws, releasesApp)
+		appID, _, err := resolveAppRef(ctx, c, eff, ws, appArg(args))
 		if err != nil {
 			return err
 		}
@@ -38,18 +35,18 @@ var releasesCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if flagJSON {
-			return printJSON(rels)
+		if structured() {
+			return emit(rels)
 		}
-		tw := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-		fmt.Fprintln(tw, "VERSION\tID\tIMAGE\tACTIVE\tCREATED")
+		t := ui.NewTable("VERSION", "IMAGE", "ACTIVE", "AGE")
 		for _, r := range rels {
 			active := ""
 			if r.Active {
-				active = "✓"
+				active = ui.Green("✓")
 			}
-			fmt.Fprintf(tw, "%d\t%d\t%s\t%s\t%s\n", r.Version, r.ID, r.Image, active, r.CreatedAt.Format("2006-01-02 15:04"))
+			t.Row("v"+itoa(r.Version), r.Image, active, ui.Age(r.CreatedAt))
 		}
-		return tw.Flush()
+		t.Print()
+		return nil
 	},
 }

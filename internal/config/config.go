@@ -28,12 +28,22 @@ type Identity struct {
 	Email    string `yaml:"email,omitempty" json:"email,omitempty"`
 }
 
+// AppRef is the current application bound by `miabi use <app>`, so app-scoped
+// commands need no explicit argument. It belongs to the active Workspace and is
+// cleared whenever the workspace changes. Slug is the handle commands address by.
+type AppRef struct {
+	ID   uint   `yaml:"id" json:"id"`
+	Slug string `yaml:"slug" json:"slug"`
+	Name string `yaml:"name,omitempty" json:"name,omitempty"`
+}
+
 // File mirrors ~/.miabi/config.yaml.
 type File struct {
 	URL       string        `yaml:"url,omitempty"`
 	Token     string        `yaml:"token,omitempty"`
 	User      *Identity     `yaml:"user,omitempty"`
 	Workspace *WorkspaceRef `yaml:"workspace,omitempty"`
+	App       *AppRef       `yaml:"app,omitempty"`
 }
 
 // Path returns the config file location (honoring MIABI_CONFIG, else
@@ -85,6 +95,7 @@ type Effective struct {
 	URL       string
 	Token     string
 	Workspace *WorkspaceRef // from the file; may be nil
+	App       *AppRef       // current app bound by `miabi use`; may be nil
 }
 
 // Resolve applies precedence flags → env (MIABI_URL/MIABI_TOKEN) → file.
@@ -101,7 +112,7 @@ func Resolve(flagURL, flagToken string) (*Effective, error) {
 	if token == "" {
 		return nil, fmt.Errorf("no API token configured — pass --token, set MIABI_TOKEN, or run `miabi login`")
 	}
-	return &Effective{URL: url, Token: token, Workspace: f.Workspace}, nil
+	return &Effective{URL: url, Token: token, Workspace: f.Workspace, App: f.App}, nil
 }
 
 func firstNonEmpty(vs ...string) string {
