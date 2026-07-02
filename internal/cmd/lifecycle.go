@@ -10,7 +10,7 @@ import (
 
 // appLifecycleCmd builds an `apps <action> [app]` subcommand (action before the
 // name, like `apps create`). The app is positional or the one bound by
-// `miabi use`; it tab-completes app slugs.
+// `miabi use`; it tab-completes app handles.
 func appLifecycleCmd(use, short, done string, fn func(*api.Client, context.Context, string, uint) error) *cobra.Command {
 	return &cobra.Command{
 		Use:               use + " [app]",

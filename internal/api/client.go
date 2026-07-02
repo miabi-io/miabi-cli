@@ -182,7 +182,7 @@ func (c *Client) CreateApp(ctx context.Context, ws string, req CreateAppRequest)
 	return &a, c.post(ctx, fmt.Sprintf("/api/v1/workspaces/%s/apps", ws), req, &a)
 }
 
-// ResolveAppID turns an app slug (or numeric id) into the numeric id paths use.
+// ResolveAppID turns an app handle (or numeric id) into the numeric id paths use.
 func (c *Client) ResolveAppID(ctx context.Context, ws string, ref string) (uint, error) {
 	if id, err := strconv.ParseUint(ref, 10, 64); err == nil {
 		return uint(id), nil
@@ -192,7 +192,7 @@ func (c *Client) ResolveAppID(ctx context.Context, ws string, ref string) (uint,
 		return 0, err
 	}
 	for _, a := range apps {
-		if a.Slug == ref {
+		if a.Name == ref {
 			return a.ID, nil
 		}
 	}
@@ -293,7 +293,7 @@ func (c *Client) Database(ctx context.Context, ws string, id uint) (*DatabaseIns
 	return &d, c.get(ctx, fmt.Sprintf("/api/v1/workspaces/%s/databases/%d", ws, id), &d)
 }
 
-// ResolveDatabaseID turns a database slug (or numeric id) into the numeric id.
+// ResolveDatabaseID turns a database handle (or numeric id) into the numeric id.
 func (c *Client) ResolveDatabaseID(ctx context.Context, ws, ref string) (uint, error) {
 	if id, err := strconv.ParseUint(ref, 10, 64); err == nil {
 		return uint(id), nil
@@ -303,7 +303,7 @@ func (c *Client) ResolveDatabaseID(ctx context.Context, ws, ref string) (uint, e
 		return 0, err
 	}
 	for _, d := range dbs {
-		if d.Slug == ref {
+		if d.Name == ref {
 			return d.ID, nil
 		}
 	}

@@ -49,7 +49,7 @@ var useCmd = &cobra.Command{
 			if structured() {
 				return emit(f.App)
 			}
-			ui.Info("Current app: %s", ui.Bold(f.App.Slug))
+			ui.Info("Current app: %s", ui.Bold(f.App.Name))
 			return nil
 		}
 
@@ -70,11 +70,11 @@ var useCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		f.App = &config.AppRef{ID: app.ID, Slug: app.Slug, Name: app.Name}
+		f.App = &config.AppRef{ID: app.ID, Name: app.Name, DisplayName: app.DisplayName}
 		if err := config.Save(f); err != nil {
 			return err
 		}
-		ui.Success("Now using %s %s", ui.Bold(app.Slug), ui.Dim(fmt.Sprintf("(%s)", app.Name)))
+		ui.Success("Now using %s %s", ui.Bold(app.Name), ui.Dim(fmt.Sprintf("(%s)", app.DisplayName)))
 		return nil
 	},
 }

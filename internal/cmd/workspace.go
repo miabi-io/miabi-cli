@@ -74,7 +74,7 @@ var workspaceShowCmd = &cobra.Command{
 		}
 		ui.Info("Active workspace: %s", ui.Bold(label))
 		if f.App != nil {
-			ui.Info("Current app: %s", ui.Bold(f.App.Slug))
+			ui.Info("Current app: %s", ui.Bold(f.App.Name))
 		}
 		return nil
 	},

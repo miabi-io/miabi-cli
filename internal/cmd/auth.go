@@ -76,7 +76,7 @@ var whoamiCmd = &cobra.Command{
 				fmt.Printf("%s    %s\n", ui.Dim("Space:"), f.Workspace.Name)
 			}
 			if f.App != nil {
-				fmt.Printf("%s      %s\n", ui.Dim("App:"), f.App.Slug)
+				fmt.Printf("%s      %s\n", ui.Dim("App:"), f.App.Name)
 			}
 		}
 		return nil

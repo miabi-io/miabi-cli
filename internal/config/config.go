@@ -30,11 +30,12 @@ type Identity struct {
 
 // AppRef is the current application bound by `miabi use <app>`, so app-scoped
 // commands need no explicit argument. It belongs to the active Workspace and is
-// cleared whenever the workspace changes. Slug is the handle commands address by.
+// cleared whenever the workspace changes. Name is the unique handle commands
+// address by; DisplayName is the free-text label, kept for display.
 type AppRef struct {
-	ID   uint   `yaml:"id" json:"id"`
-	Slug string `yaml:"slug" json:"slug"`
-	Name string `yaml:"name,omitempty" json:"name,omitempty"`
+	ID          uint   `yaml:"id" json:"id"`
+	Name        string `yaml:"name" json:"name"`
+	DisplayName string `yaml:"display_name,omitempty" json:"display_name,omitempty"`
 }
 
 // File mirrors ~/.miabi/config.yaml.

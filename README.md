@@ -31,7 +31,7 @@ miabi --version
 **Docker** (GitHub Container Registry):
 
 ```bash
-docker run --rm -e MIABI_URL -e MIABI_TOKEN ghcr.io/miabi-io/miabi-cli:latest whoami
+docker run --rm -e MIABI_URL -e MIABI_TOKEN miabi/miabi-cli:latest whoami
 ```
 
 ## Authenticate

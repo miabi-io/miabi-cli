@@ -32,11 +32,12 @@ type Workspace struct {
 	Role        string `json:"role"`
 }
 
-// App is an application listing/detail (only the fields the CLI surfaces).
+// App is an application listing/detail (only the fields the CLI surfaces). Name
+// is the unique handle; DisplayName is the free-text label.
 type App struct {
 	ID               uint   `json:"id"`
-	Slug             string `json:"slug"`
 	Name             string `json:"name"`
+	DisplayName      string `json:"display_name"`
 	Image            string `json:"image"`
 	Tag              string `json:"tag"`
 	Status           string `json:"status"`
@@ -45,8 +46,11 @@ type App struct {
 
 // CreateAppRequest is the body of POST .../apps (only the common fields the CLI
 // exposes). SourceType is "image" or "git"; the CLI infers it from the flags.
+// DisplayName is the required free-text label; Name pins the handle (the server
+// otherwise derives it from DisplayName).
 type CreateAppRequest struct {
-	Name        string   `json:"name"`
+	DisplayName string   `json:"display_name"`
+	Name        string   `json:"name,omitempty"`
 	ServerID    uint     `json:"server_id,omitempty"`
 	SourceType  string   `json:"source_type,omitempty"`
 	Image       string   `json:"image,omitempty"`
@@ -140,10 +144,11 @@ type ImportEnvRequest struct {
 // === databases ============================================================
 
 // DatabaseInstance is a managed database server (only the fields the CLI shows).
+// Name is the unique handle; DisplayName is the free-text label.
 type DatabaseInstance struct {
 	ID          uint      `json:"id"`
-	Slug        string    `json:"slug"`
 	Name        string    `json:"name"`
+	DisplayName string    `json:"display_name"`
 	Engine      string    `json:"engine"`
 	Version     string    `json:"version"`
 	Status      string    `json:"status"`

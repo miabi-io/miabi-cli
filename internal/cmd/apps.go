@@ -84,6 +84,7 @@ var appCreateCmd = &cobra.Command{
 			return err
 		}
 		app, err := c.CreateApp(ctx, ws, api.CreateAppRequest{
+			DisplayName: args[0],
 			Name:        args[0],
 			SourceType:  source,
 			Image:       appCreateImage,
@@ -100,7 +101,7 @@ var appCreateCmd = &cobra.Command{
 
 		if appCreateUse {
 			if f, ferr := config.Load(); ferr == nil {
-				f.App = &config.AppRef{ID: app.ID, Slug: app.Slug, Name: app.Name}
+				f.App = &config.AppRef{ID: app.ID, Name: app.Name, DisplayName: app.DisplayName}
 				_ = config.Save(f)
 			}
 		}
@@ -108,11 +109,11 @@ var appCreateCmd = &cobra.Command{
 		if structured() {
 			return emit(app)
 		}
-		ui.Success("Created %s %s", ui.Bold(app.Slug), ui.Dim(fmt.Sprintf("(%s)", source)))
+		ui.Success("Created %s %s", ui.Bold(app.Name), ui.Dim(fmt.Sprintf("(%s)", source)))
 		if appCreateUse {
-			ui.Info("Now using %s", app.Slug)
+			ui.Info("Now using %s", app.Name)
 		}
-		ui.Info("Deploy it: miabi apps deploy %s", app.Slug)
+		ui.Info("Deploy it: miabi apps deploy %s", app.Name)
 		return nil
 	},
 }
@@ -140,15 +141,15 @@ var appLsCmd = &cobra.Command{
 		}
 		bound := ""
 		if eff.App != nil {
-			bound = eff.App.Slug
+			bound = eff.App.Name
 		}
-		t := ui.NewTable("", "SLUG", "IMAGE", "TAG", "STATUS")
+		t := ui.NewTable("", "NAME", "IMAGE", "TAG", "STATUS")
 		for _, a := range apps {
 			marker := " "
-			if a.Slug == bound {
+			if a.Name == bound {
 				marker = ui.Cyan("→")
 			}
-			t.Row(marker, a.Slug, a.Image, a.Tag, ui.Status(a.Status))
+			t.Row(marker, a.Name, a.Image, a.Tag, ui.Status(a.Status))
 		}
 		t.Print()
 		return nil

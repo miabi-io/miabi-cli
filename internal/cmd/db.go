@@ -60,7 +60,7 @@ var dbCmd = &cobra.Command{
 	Aliases: []string{"database", "databases"},
 	Short:   "Manage databases (PostgreSQL, MySQL, MariaDB, Redis, MongoDB, libSQL)",
 	Long: "Provision and operate managed database instances, and manage the logical\n" +
-		"databases hosted on them. Instances are addressed by slug or numeric id.",
+		"databases hosted on them. Instances are addressed by name or numeric id.",
 	Example: "  miabi db ls\n" +
 		"  miabi db create shop --engine postgres --version 16\n" +
 		"  miabi db logs shop --tail 100\n" +
@@ -68,7 +68,7 @@ var dbCmd = &cobra.Command{
 }
 
 // dbConn resolves the connection context, workspace, and instance id from a
-// single positional argument (slug or id) — the shared preamble for db commands.
+// single positional argument (name or id) — the shared preamble for db commands.
 func dbConn(ctx context.Context, ref string) (*api.Client, string, uint, error) {
 	c, eff, err := newClient()
 	if err != nil {
@@ -106,9 +106,9 @@ var dbLsCmd = &cobra.Command{
 		if structured() {
 			return emit(dbs)
 		}
-		t := ui.NewTable("SLUG", "ENGINE", "VERSION", "STATUS", "ADDRESS", "SIZE")
+		t := ui.NewTable("NAME", "ENGINE", "VERSION", "STATUS", "ADDRESS", "SIZE")
 		for _, d := range dbs {
-			t.Row(d.Slug, d.Engine, d.Version, ui.Status(d.Status), fmt.Sprintf("%s:%d", d.Host, d.Port), humanBytes(d.SizeBytes))
+			t.Row(d.Name, d.Engine, d.Version, ui.Status(d.Status), fmt.Sprintf("%s:%d", d.Host, d.Port), humanBytes(d.SizeBytes))
 		}
 		t.Print()
 		return nil
@@ -168,8 +168,8 @@ var dbCreateCmd = &cobra.Command{
 		if structured() {
 			return emit(d)
 		}
-		ui.Success("Provisioning %s %s (%s)", ui.Bold(d.Slug), ui.Dim(fmt.Sprintf("(%s %s)", d.Engine, d.Version)), ui.Status(d.Status))
-		ui.Info("Watch it come up: miabi db logs %s", d.Slug)
+		ui.Success("Provisioning %s %s (%s)", ui.Bold(d.Name), ui.Dim(fmt.Sprintf("(%s %s)", d.Engine, d.Version)), ui.Status(d.Status))
+		ui.Info("Watch it come up: miabi db logs %s", d.Name)
 		return nil
 	},
 }
@@ -191,7 +191,7 @@ var dbGetCmd = &cobra.Command{
 		if structured() {
 			return emit(d)
 		}
-		ui.Info("%s (%s): %s", ui.Bold(d.Name), d.Slug, ui.Status(d.Status))
+		ui.Info("%s (%s): %s", ui.Bold(d.DisplayName), d.Name, ui.Status(d.Status))
 		ui.Info("Engine:  %s %s", d.Engine, d.Version)
 		ui.Info("Address: %s:%d", d.Host, d.Port)
 		if d.AdminUser != "" {
@@ -498,7 +498,7 @@ func printConnection(info *api.ConnectionInfo) {
 	ui.Info("URI:      %s", info.URI)
 }
 
-// completeDatabases tab-completes database instance slugs in the active workspace.
+// completeDatabases tab-completes database instance handles in the active workspace.
 func completeDatabases(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) > 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
@@ -518,8 +518,8 @@ func completeDatabases(_ *cobra.Command, args []string, toComplete string) ([]st
 	}
 	var out []string
 	for _, d := range dbs {
-		if toComplete == "" || strings.HasPrefix(d.Slug, toComplete) {
-			out = append(out, d.Slug)
+		if toComplete == "" || strings.HasPrefix(d.Name, toComplete) {
+			out = append(out, d.Name)
 		}
 	}
 	return out, cobra.ShellCompDirectiveNoFileComp

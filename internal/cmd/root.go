@@ -128,11 +128,11 @@ func emit(v any) error {
 // resolveAppRef resolves the target application for an app-scoped command:
 // an explicit reference (the command's positional arg) wins, else the app bound
 // by `miabi use`, else a helpful error. It returns the numeric id API paths use
-// and the handle to display. ref is the slug or numeric id ("" to use the bound app).
+// and the handle to display. ref is the handle or numeric id ("" to use the bound app).
 func resolveAppRef(ctx context.Context, c *api.Client, eff *config.Effective, ws, ref string) (uint, string, error) {
 	if ref == "" && eff.App != nil {
-		if eff.App.Slug != "" {
-			ref = eff.App.Slug
+		if eff.App.Name != "" {
+			ref = eff.App.Name
 		} else if eff.App.ID != 0 {
 			ref = strconv.FormatUint(uint64(eff.App.ID), 10)
 		}
@@ -156,7 +156,7 @@ func appArg(args []string) string {
 	return ""
 }
 
-// completeApps is a cobra ValidArgsFunction that tab-completes app slugs in the
+// completeApps is a cobra ValidArgsFunction that tab-completes app handles in the
 // active workspace. Best-effort: any error yields no completions.
 func completeApps(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) > 0 {
@@ -177,8 +177,8 @@ func completeApps(_ *cobra.Command, args []string, toComplete string) ([]string,
 	}
 	var out []string
 	for _, a := range apps {
-		if toComplete == "" || strings.HasPrefix(a.Slug, toComplete) {
-			out = append(out, a.Slug)
+		if toComplete == "" || strings.HasPrefix(a.Name, toComplete) {
+			out = append(out, a.Name)
 		}
 	}
 	return out, cobra.ShellCompDirectiveNoFileComp
