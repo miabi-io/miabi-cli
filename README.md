@@ -107,6 +107,24 @@ miabi db databases connection shop app_prod   # reveal connection (admin)
 miabi db databases rm shop app_prod [--yes]
 ```
 
+### Secrets
+
+The workspace **vault**: values encrypted at rest, write-only over the API, and
+referenced from an app's env as `${{ secrets.NAME }}`. Secrets are addressed by
+**name** (or numeric id). Supply a value with `--from-file` or stdin to keep it
+out of your shell history.
+
+```
+miabi secrets ls                              # list secrets (no values)
+miabi secrets get API_KEY                     # details: description, version, created/updated
+miabi secrets set API_KEY --from-file api.key # create, or rotate if it exists
+cat api.key | miabi secrets set API_KEY --from-file -
+miabi secrets set API_KEY --description "..." # keep the value, edit metadata
+miabi secrets reveal API_KEY                  # print the value (admin; audited)
+miabi secrets usage API_KEY                   # apps referencing it
+miabi secrets rm API_KEY [--yes]
+```
+
 `[web]` is optional when an app is bound with `miabi use`. Deployments and
 releases are addressed by their **per-app number/version** (the `NUMBER` /
 `VERSION` columns), not the global platform id. Shell completion (`miabi

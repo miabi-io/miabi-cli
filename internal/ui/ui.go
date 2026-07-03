@@ -80,6 +80,13 @@ func Info(format string, a ...any) {
 	fmt.Fprintln(os.Stdout, Cyan("→")+" "+fmt.Sprintf(format, a...))
 }
 
+// Detail prints a plain line to stdout with no leading glyph. Use it for
+// resource-detail views (aligned "Field: value" blocks) where the arrow Info
+// prepends would be visual noise; keep Info for progress and next-step hints.
+func Detail(format string, a ...any) {
+	fmt.Fprintln(os.Stdout, fmt.Sprintf(format, a...))
+}
+
 // Warn prints a yellow bang line to stderr.
 func Warn(format string, a ...any) {
 	fmt.Fprintln(os.Stderr, Yellow("!")+" "+fmt.Sprintf(format, a...))

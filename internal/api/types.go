@@ -219,6 +219,51 @@ type CreateLogicalDatabaseResult struct {
 	EnvInjected bool            `json:"env_injected"`
 }
 
+// === secrets (workspace Vault) ============================================
+
+// Secret is one entry of the workspace Vault. Values are write-only over the API
+// and never appear here — reveal them explicitly (admin-only, audited). Name is
+// the unique handle env refs use (${{ secrets.NAME }}); DisplayName is a label.
+type Secret struct {
+	ID          uint   `json:"id"`
+	UID         string `json:"uid"`
+	Name        string `json:"name"`
+	DisplayName string `json:"display_name"`
+	Description string `json:"description"`
+	// Version bumps on each value rotation.
+	Version int `json:"version"`
+	// Managed marks a secret owned by a platform resource (e.g. a managed
+	// database); rotate it via its owner, not by hand.
+	Managed   bool      `json:"managed"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// CreateSecretRequest is the body of POST .../secrets.
+type CreateSecretRequest struct {
+	Name        string `json:"name"`
+	Value       string `json:"value"`
+	Description string `json:"description,omitempty"`
+}
+
+// UpdateSecretRequest is the body of PUT .../secrets/{id}. A blank Value keeps
+// the stored value (a description-only edit); a new value rotates the secret.
+type UpdateSecretRequest struct {
+	Value       string `json:"value"`
+	Description string `json:"description"`
+}
+
+// SecretReveal is the payload of GET .../secrets/{id}/reveal.
+type SecretReveal struct {
+	Value string `json:"value"`
+}
+
+// SecretUsage is one app referencing a secret (GET .../secrets/{id}/usage).
+type SecretUsage struct {
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
+}
+
 // ApplyRequest is the body of POST .../apply — a miabi.io/v1 manifest bundle and
 // the converge options.
 type ApplyRequest struct {
