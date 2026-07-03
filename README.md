@@ -20,7 +20,7 @@ go install github.com/miabi-io/miabi-cli@latest   # installs the `miabi` binary
 page, or grab the archive for your platform directly (Linux x86_64 shown):
 
 ```bash
-VERSION=0.1.0
+VERSION=0.3.0
 curl -fsSL "https://github.com/miabi-io/miabi-cli/releases/download/v${VERSION}/miabi_${VERSION}_linux_amd64.tar.gz" \
   | tar -xz miabi && sudo mv miabi /usr/local/bin/
 miabi --version
