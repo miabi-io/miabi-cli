@@ -380,6 +380,73 @@ func (c *Client) ImportEnv(ctx context.Context, ws string, appID uint, req Impor
 	return c.post(ctx, fmt.Sprintf("/api/v1/workspaces/%s/apps/%d/env/import", ws, appID), req, nil)
 }
 
+// --- secrets (workspace Vault) ---------------------------------------------
+
+// Secrets lists a workspace's secrets (names + metadata, never values). The list
+// endpoint is paginated; a large page size fetches them in one call.
+func (c *Client) Secrets(ctx context.Context, ws string) ([]Secret, error) {
+	var s []Secret
+	return s, c.get(ctx, fmt.Sprintf("/api/v1/workspaces/%s/secrets?page=0&size=500", ws), &s)
+}
+
+func (c *Client) CreateSecret(ctx context.Context, ws string, req CreateSecretRequest) (*Secret, error) {
+	var s Secret
+	return &s, c.post(ctx, fmt.Sprintf("/api/v1/workspaces/%s/secrets", ws), req, &s)
+}
+
+func (c *Client) UpdateSecret(ctx context.Context, ws string, id uint, req UpdateSecretRequest) (*Secret, error) {
+	var s Secret
+	return &s, c.put(ctx, fmt.Sprintf("/api/v1/workspaces/%s/secrets/%d", ws, id), req, &s)
+}
+
+// RevealSecret returns a secret's decrypted value (admin only, audited).
+func (c *Client) RevealSecret(ctx context.Context, ws string, id uint) (string, error) {
+	var r SecretReveal
+	if err := c.get(ctx, fmt.Sprintf("/api/v1/workspaces/%s/secrets/%d/reveal", ws, id), &r); err != nil {
+		return "", err
+	}
+	return r.Value, nil
+}
+
+func (c *Client) SecretUsage(ctx context.Context, ws string, id uint) ([]SecretUsage, error) {
+	var u []SecretUsage
+	return u, c.get(ctx, fmt.Sprintf("/api/v1/workspaces/%s/secrets/%d/usage", ws, id), &u)
+}
+
+func (c *Client) DeleteSecret(ctx context.Context, ws string, id uint) error {
+	return c.del(ctx, fmt.Sprintf("/api/v1/workspaces/%s/secrets/%d", ws, id), nil)
+}
+
+// FindSecretByName returns the workspace secret with the given name, or nil when
+// none exists (used by `set` to choose between create and rotate).
+func (c *Client) FindSecretByName(ctx context.Context, ws, name string) (*Secret, error) {
+	secrets, err := c.Secrets(ctx, ws)
+	if err != nil {
+		return nil, err
+	}
+	for i := range secrets {
+		if secrets[i].Name == name {
+			return &secrets[i], nil
+		}
+	}
+	return nil, nil
+}
+
+// ResolveSecretID turns a secret name (or numeric id) into its numeric id.
+func (c *Client) ResolveSecretID(ctx context.Context, ws, ref string) (uint, error) {
+	if id, err := strconv.ParseUint(ref, 10, 64); err == nil {
+		return uint(id), nil
+	}
+	s, err := c.FindSecretByName(ctx, ws, ref)
+	if err != nil {
+		return 0, err
+	}
+	if s == nil {
+		return 0, fmt.Errorf("secret %q not found in this workspace", ref)
+	}
+	return s.ID, nil
+}
+
 // ========= declarative apply ===================================
 
 // PlanApply previews converging the workspace to the manifest bundle (dry-run).

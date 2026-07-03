@@ -191,26 +191,26 @@ var dbGetCmd = &cobra.Command{
 		if structured() {
 			return emit(d)
 		}
-		ui.Info("%s (%s): %s", ui.Bold(d.DisplayName), d.Name, ui.Status(d.Status))
-		ui.Info("Engine:  %s %s", d.Engine, d.Version)
-		ui.Info("Address: %s:%d", d.Host, d.Port)
+		ui.Detail("%s (%s): %s", ui.Bold(d.DisplayName), d.Name, ui.Status(d.Status))
+		ui.Detail("Engine:  %s %s", d.Engine, d.Version)
+		ui.Detail("Address: %s:%d", d.Host, d.Port)
 		if d.AdminUser != "" {
-			ui.Info("Admin:   %s", d.AdminUser)
+			ui.Detail("Admin:   %s", d.AdminUser)
 		}
 		if d.SizeBytes > 0 {
-			ui.Info("Size:    %s", humanBytes(d.SizeBytes))
+			ui.Detail("Size:    %s", humanBytes(d.SizeBytes))
 		}
 		node := d.ServerName
 		if node == "" {
 			node = "local"
 		}
-		ui.Info("Node:    %s", node)
+		ui.Detail("Node:    %s", node)
 		if !d.CreatedAt.IsZero() {
 			age := ui.Age(d.CreatedAt)
 			if age != "just now" {
 				age += " ago"
 			}
-			ui.Info("Created: %s %s", d.CreatedAt.Local().Format("2006-01-02 15:04"), ui.Dim("("+age+")"))
+			ui.Detail("Created: %s %s", d.CreatedAt.Local().Format("2006-01-02 15:04"), ui.Dim("("+age+")"))
 		}
 		return nil
 	},
@@ -488,14 +488,14 @@ func resolveLogicalDB(ctx context.Context, c *api.Client, ws string, instID uint
 // printConnection renders a revealed connection; the password is shown because
 // the command exists to reveal it (admin-gated server-side).
 func printConnection(info *api.ConnectionInfo) {
-	ui.Info("Host:     %s", info.Host)
-	ui.Info("Port:     %d", info.Port)
-	ui.Info("User:     %s", info.Username)
-	ui.Info("Password: %s", info.Password)
+	ui.Detail("Host:     %s", info.Host)
+	ui.Detail("Port:     %d", info.Port)
+	ui.Detail("User:     %s", info.Username)
+	ui.Detail("Password: %s", info.Password)
 	if info.Database != "" {
-		ui.Info("Database: %s", info.Database)
+		ui.Detail("Database: %s", info.Database)
 	}
-	ui.Info("URI:      %s", info.URI)
+	ui.Detail("URI:      %s", info.URI)
 }
 
 // completeDatabases tab-completes database instance handles in the active workspace.
