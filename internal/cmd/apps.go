@@ -19,6 +19,7 @@ var (
 	appCreatePort        int
 	appCreateNode        uint
 	appCreateUse         bool
+	appRmYes             bool
 )
 
 func init() {
@@ -32,7 +33,9 @@ func init() {
 	f.UintVar(&appCreateNode, "node", 0, "node/server id to place on (0 = local)")
 	f.BoolVar(&appCreateUse, "use", false, "bind the new app as the current app (like `miabi use`)")
 
-	appCmd.AddCommand(appLsCmd, appCreateCmd, appStartCmd, appStopCmd, appRestartCmd)
+	appRmCmd.Flags().BoolVarP(&appRmYes, "yes", "y", false, "skip the confirmation prompt")
+
+	appCmd.AddCommand(appLsCmd, appCreateCmd, appRmCmd, appStartCmd, appStopCmd, appRestartCmd)
 	rootCmd.AddCommand(appCmd)
 }
 
@@ -47,7 +50,8 @@ var appCmd = &cobra.Command{
 		"  miabi apps create web --image ghcr.io/acme/web\n" +
 		"  miabi apps deploy web --tag $GIT_SHA --wait\n" +
 		"  miabi apps logs web\n" +
-		"  miabi apps restart web",
+		"  miabi apps restart web\n" +
+		"  miabi apps rm web",
 }
 
 var appCreateCmd = &cobra.Command{
@@ -114,6 +118,57 @@ var appCreateCmd = &cobra.Command{
 			ui.Info("Now using %s", app.Name)
 		}
 		ui.Info("Deploy it: miabi apps deploy %s", app.Name)
+		return nil
+	},
+}
+
+var appRmCmd = &cobra.Command{
+	Use:     "rm [app]",
+	Aliases: []string{"delete", "destroy"},
+	Short:   "Delete an application (removes its container and all releases)",
+	Long: "Deletes the app from the workspace, stopping and removing its container and\n" +
+		"deployment history. This cannot be undone. Uses the app bound by `miabi use`\n" +
+		"when no argument is given; clears that binding if it was the deleted app.",
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: completeApps,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+		c, eff, err := newClient()
+		if err != nil {
+			return err
+		}
+		ws, err := workspaceRef(ctx, c, eff)
+		if err != nil {
+			return err
+		}
+		appID, appRef, err := resolveAppRef(ctx, c, eff, ws, appArg(args))
+		if err != nil {
+			return err
+		}
+		if !appRmYes && !structured() {
+			prompt := fmt.Sprintf("Delete application %s and all its releases? This cannot be undone.", ui.Bold(appRef))
+
+			if app, aerr := c.App(ctx, ws, appID); aerr == nil && app.Status == "running" {
+				prompt = fmt.Sprintf("Application %s is currently running. Deleting it stops and removes its container and all releases. This cannot be undone.\nDelete it?", ui.Bold(appRef))
+			}
+			if !ui.Confirm(prompt) {
+				ui.Info("Aborted")
+				return nil
+			}
+		}
+		if err := c.DeleteApp(ctx, ws, appID); err != nil {
+			return err
+		}
+		// Clear the bound app if we just deleted it, so later commands don't
+		// resolve a dangling reference.
+		if f, ferr := config.Load(); ferr == nil && f.App != nil && f.App.ID == appID {
+			f.App = nil
+			_ = config.Save(f)
+		}
+		if structured() {
+			return emit(map[string]any{"deleted": true, "app": appRef})
+		}
+		ui.Success("Deleted %s", ui.Bold(appRef))
 		return nil
 	},
 }
