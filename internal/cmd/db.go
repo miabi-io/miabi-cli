@@ -331,7 +331,12 @@ var dbRmCmd = &cobra.Command{
 			return err
 		}
 		if !dbRmYes && !structured() {
-			if !ui.Confirm(fmt.Sprintf("Delete database %s and all its data? This cannot be undone.", ui.Bold(args[0]))) {
+			prompt := fmt.Sprintf("Delete database %s and all its data? This cannot be undone.", ui.Bold(args[0]))
+
+			if inst, ierr := c.Database(ctx, ws, id); ierr == nil && inst.Status == "running" {
+				prompt = fmt.Sprintf("Database %s is currently running. Deleting it stops and removes its container and all its data. This cannot be undone.\nDelete it?", ui.Bold(args[0]))
+			}
+			if !ui.Confirm(prompt) {
 				ui.Info("Aborted")
 				return nil
 			}

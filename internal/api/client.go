@@ -221,6 +221,10 @@ func (c *Client) RestartApp(ctx context.Context, ws string, appID uint) error {
 	return c.appAction(ctx, ws, appID, "restart")
 }
 
+func (c *Client) DeleteApp(ctx context.Context, ws string, appID uint) error {
+	return c.del(ctx, fmt.Sprintf("/api/v1/workspaces/%s/apps/%d", ws, appID), nil)
+}
+
 func (c *Client) Rollback(ctx context.Context, ws string, appID uint, req RollbackRequest) (*Deployment, error) {
 	var d Deployment
 	return &d, c.post(ctx, fmt.Sprintf("/api/v1/workspaces/%s/apps/%d/rollback", ws, appID), req, &d)

@@ -5,8 +5,6 @@ Drive the deploy flow from a terminal or CI — `miabi apps deploy web --tag $SH
 updates the image, deploys, blocks until the deployment is terminal, and **exits
 non‑zero on failure**.
 
-It is a pure consumer of the documented `/api/v1` HTTP API; it imports nothing from the
-server.
 
 ## Install
 
