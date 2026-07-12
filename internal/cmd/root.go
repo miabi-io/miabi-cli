@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -109,6 +110,26 @@ func workspaceRef(ctx context.Context, c *api.Client, eff *config.Effective) (st
 
 // itoa is a terse strconv.Itoa for building table cells.
 func itoa(n int) string { return strconv.Itoa(n) }
+
+// readFileOrStdin reads a value from path, or from stdin when path is "-". The
+// trailing newline is trimmed, so `printf '%s\n' secret > f` and `echo secret |
+// … -` both yield the value without a stray \n. Reading from a file or a pipe is
+// how a secret stays out of your shell history.
+func readFileOrStdin(path string) (string, error) {
+	var (
+		b   []byte
+		err error
+	)
+	if path == "-" {
+		b, err = io.ReadAll(os.Stdin)
+	} else {
+		b, err = os.ReadFile(path)
+	}
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimRight(string(b), "\n"), nil
+}
 
 // structured reports whether the user asked for machine-readable output
 // (--json or -o json|yaml), in which case commands skip their human rendering.

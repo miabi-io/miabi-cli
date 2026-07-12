@@ -128,6 +128,14 @@ type RollbackRequest struct {
 	ReleaseID uint `json:"release_id"`
 }
 
+// EnvVar is one of an application's environment variables. The server masks the
+// value of a secret var, so Value is never the plaintext for those.
+type EnvVar struct {
+	Key      string `json:"key"`
+	Value    string `json:"value"`
+	IsSecret bool   `json:"is_secret"`
+}
+
 // SetEnvRequest is the body of PUT .../env.
 type SetEnvRequest struct {
 	Key      string `json:"key"`

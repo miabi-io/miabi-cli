@@ -29,6 +29,27 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
+brews:
+  - name: miabi
+    ids: [miabi]
+    homepage: "https://miabi.io"
+    description: "Command-line client for the Miabi control panel"
+    license: "Apache-2.0"
+    directory: Formula
+    repository:
+      owner: miabi-io
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    commit_author:
+      name: miabi-bot
+      email: bot@miabi.io
+    install: |
+      bin.install "miabi"
+      generate_completions_from_executable(bin/"miabi", "completion")
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/miabi --version")
+
 snapshot:
   version_template: "{{ incpatch .Version }}-dev"
 

@@ -323,18 +323,11 @@ func readSecretValue() (string, bool, error) {
 		return secretValue, true, nil
 	}
 	if secretFromFile != "" {
-		if secretFromFile == "-" {
-			b, err := io.ReadAll(os.Stdin)
-			if err != nil {
-				return "", false, err
-			}
-			return strings.TrimRight(string(b), "\n"), true, nil
-		}
-		b, err := os.ReadFile(secretFromFile)
+		v, err := readFileOrStdin(secretFromFile)
 		if err != nil {
 			return "", false, err
 		}
-		return strings.TrimRight(string(b), "\n"), true, nil
+		return v, true, nil
 	}
 	// Piped stdin (not an interactive terminal) is treated as the value.
 	if fi, err := os.Stdin.Stat(); err == nil && (fi.Mode()&os.ModeCharDevice) == 0 {

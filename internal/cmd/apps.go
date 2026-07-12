@@ -24,7 +24,7 @@ var (
 
 func init() {
 	f := appCreateCmd.Flags()
-	f.StringVar(&appCreateImage, "image", "", "container image (image source, e.g. ghcr.io/acme/web)")
+	f.StringVar(&appCreateImage, "image", "", "container image (image source, e.g. miabi/guestbook)")
 	f.StringVar(&appCreateTag, "tag", "", "image tag (image source; default: latest)")
 	f.StringVar(&appCreateGitRepo, "git-repo", "", "git clone URL (git source)")
 	f.StringVar(&appCreateGitRef, "git-ref", "", "git branch/ref (git source)")
@@ -47,7 +47,7 @@ var appCmd = &cobra.Command{
 		"rollback, env, and lifecycle (start/stop/restart). Each verb takes the app as\n" +
 		"its first argument, or uses the one bound by `miabi use`.",
 	Example: "  miabi apps ls\n" +
-		"  miabi apps create web --image ghcr.io/acme/web\n" +
+		"  miabi apps create web --image miabi/guestbook\n" +
 		"  miabi apps deploy web --tag $GIT_SHA --wait\n" +
 		"  miabi apps logs web\n" +
 		"  miabi apps restart web\n" +
@@ -60,7 +60,7 @@ var appCreateCmd = &cobra.Command{
 	Long: "Creates an app in the workspace. Provide --image for an image-source app or\n" +
 		"--git-repo for a git-source app. The app is created but not deployed — run\n" +
 		"`miabi deploy <app>` (or pass --use to bind it first).",
-	Example: "  miabi apps create web --image ghcr.io/acme/web --tag 1.0 --port 3000\n" +
+	Example: "  miabi apps create web --image miabi/guestbook --tag 1.0 --port 3000\n" +
 		"  miabi apps create api --git-repo https://github.com/acme/api --git-ref main --use",
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

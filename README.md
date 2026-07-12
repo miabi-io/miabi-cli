@@ -8,6 +8,24 @@ non‑zero on failure**.
 
 ## Install
 
+**Homebrew** (macOS & Linux) — from the [miabi-io/homebrew-tap](https://github.com/miabi-io/homebrew-tap):
+
+```bash
+brew install miabi-io/tap/miabi
+```
+
+<details>
+<summary>…or tap first</summary>
+
+Homebrew 6 requires third-party taps to be trusted before the short form works:
+
+```bash
+brew tap miabi-io/tap
+brew trust miabi-io/tap
+brew install miabi
+```
+</details>
+
 **Go:**
 
 ```bash
@@ -18,7 +36,7 @@ go install github.com/miabi-io/miabi-cli@latest   # installs the `miabi` binary
 page, or grab the archive for your platform directly (Linux x86_64 shown):
 
 ```bash
-VERSION=0.3.0
+VERSION=0.4.0
 curl -fsSL "https://github.com/miabi-io/miabi-cli/releases/download/v${VERSION}/miabi_${VERSION}_linux_amd64.tar.gz" \
   | tar -xz miabi && sudo mv miabi /usr/local/bin/
 miabi --version
@@ -26,10 +44,20 @@ miabi --version
 
 (Swap `linux_amd64` for `linux_arm64`, `darwin_amd64`, `darwin_arm64`, or use the `.zip` for Windows.)
 
-**Docker** (GitHub Container Registry):
+**Docker** — no install at all; handy in CI. Published to Docker Hub and mirrored to GHCR
+(`ghcr.io/miabi-io/miabi-cli`):
 
 ```bash
+# check the connection
 docker run --rm -e MIABI_URL -e MIABI_TOKEN miabi/miabi-cli:latest whoami
+
+# deploy from a pipeline — exits non-zero if the rollout fails
+docker run --rm -e MIABI_URL -e MIABI_TOKEN \
+  miabi/miabi-cli:latest apps deploy web --tag "$GIT_SHA" --wait
+
+# mount a manifest to apply it declaratively
+docker run --rm -e MIABI_URL -e MIABI_TOKEN -v "$PWD:/work" -w /work \
+  miabi/miabi-cli:latest apply -f stack.yaml
 ```
 
 ## Authenticate
@@ -62,11 +90,11 @@ argument** — or you can bind a default once with `miabi use <app>` and omit it
 
 ```
 miabi whoami                       # identity, scopes, active workspace + app
-miabi workspace list|show|switch   # set the active workspace context
+miabi workspace ls|show|switch     # set the active workspace context (alias: ws)
 miabi use web                      # bind a default app (per workspace)
 
 miabi apps ls                      # list applications (→ marks the bound app)
-miabi apps create web (--image ghcr.io/acme/web [--tag 1.0] | --git-repo <url> [--git-ref main]) [--port 3000] [--use]
+miabi apps create web (--image miabi/guestbook [--tag 1.0] | --git-repo <url> [--git-ref main]) [--port 3000] [--use]
 miabi apps deploy      [web] --tag $SHA [--strategy rolling] [--wait] [--timeout 10m]
 miabi apps start|stop|restart [web]               # control the app's container
 miabi apps deployments [web]                      # deploy history — the NUMBER column
@@ -75,8 +103,10 @@ miabi apps logs        [web] --deployment 7               # a deployment's build
 miabi apps status      [web] [--deployment 7]
 miabi apps releases    [web]
 miabi apps rollback    [web] (--to <version> | --to-previous) [--yes]
+miabi apps env ls      [web]                              # secret values are masked
 miabi apps env set     [web] KEY=VALUE [--secret]
-miabi apps env import  [web] --file .env [--secret]
+miabi apps env set     [web] KEY --from-file f [--secret] # value from a file/stdin — no shell history
+miabi apps env import  [web] --from-file .env [--secret]  # "-" reads stdin
 
 miabi apply  -f stack.yaml [--prune] [--dry-run]  # declarative: converge to a manifest bundle
 miabi delete -f stack.yaml [--dry-run]            # delete exactly the resources the bundle names
