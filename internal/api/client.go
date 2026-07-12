@@ -376,6 +376,13 @@ func (c *Client) DeleteLogicalDatabase(ctx context.Context, ws string, id, dbID 
 
 // --- env -------------------------------------------------------------------
 
+// EnvVars lists an application's environment variables. Secret values come back
+// masked — the API never returns them in plaintext.
+func (c *Client) EnvVars(ctx context.Context, ws string, appID uint) ([]EnvVar, error) {
+	var vars []EnvVar
+	return vars, c.get(ctx, fmt.Sprintf("/api/v1/workspaces/%s/apps/%d/env", ws, appID), &vars)
+}
+
 func (c *Client) SetEnv(ctx context.Context, ws string, appID uint, req SetEnvRequest) error {
 	return c.put(ctx, fmt.Sprintf("/api/v1/workspaces/%s/apps/%d/env", ws, appID), req, nil)
 }

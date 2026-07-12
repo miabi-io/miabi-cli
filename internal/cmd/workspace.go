@@ -22,8 +22,9 @@ var workspaceCmd = &cobra.Command{
 }
 
 var workspaceListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List the workspaces you can access",
+	Use:     "list",
+	Aliases: []string{"ls"},
+	Short:   "List the workspaces you can access",
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		c, _, err := newClient()
 		if err != nil {
