@@ -23,8 +23,12 @@ var version = "dev"
 
 // Persistent flags shared by every command.
 var (
-	flagURL       string
+	flagContext   string
+	flagServer    string
+	flagURL       string // deprecated alias of --server
 	flagToken     string
+	flagCA        string
+	flagInsecure  bool
 	flagWorkspace string
 	flagJSON      bool
 	flagOutput    string
@@ -32,11 +36,15 @@ var (
 	flagVerbose   bool
 )
 
+// serverFlag returns the effective server URL from the flags: --server, else the
+// deprecated --url.
+func serverFlag() string { return firstNonEmpty(flagServer, flagURL) }
+
 var rootCmd = &cobra.Command{
 	Use:   "miabi",
 	Short: "Imperative client for a Miabi control panel",
 	Long: "miabi drives the deploy flow against a Miabi panel's /api/v1 HTTP API.\n\n" +
-		"Authenticate with MIABI_URL + MIABI_TOKEN (or `miabi login`), pick a workspace\n" +
+		"Authenticate with MIABI_SERVER + MIABI_TOKEN (or `miabi login`), pick a workspace\n" +
 		"with `miabi workspace switch`, and bind a default app with `miabi use <app>` so\n" +
 		"app commands need no argument.",
 	Example: "  miabi use web                      # bind a default app\n" +
@@ -69,8 +77,13 @@ func init() {
 	api.Version = version
 	rootCmd.Version = version
 	pf := rootCmd.PersistentFlags()
-	pf.StringVar(&flagURL, "url", "", "panel URL (env MIABI_URL)")
+	pf.StringVar(&flagContext, "context", "", "config context to use (env MIABI_CONTEXT; default: current)")
+	pf.StringVar(&flagServer, "server", "", "Miabi server URL (env MIABI_SERVER)")
+	pf.StringVar(&flagURL, "url", "", "deprecated: use --server")
+	_ = pf.MarkDeprecated("url", "use --server instead")
 	pf.StringVar(&flagToken, "token", "", "API token (env MIABI_TOKEN)")
+	pf.StringVar(&flagCA, "certificate-authority", "", "path to a CA bundle to trust (env MIABI_CA)")
+	pf.BoolVar(&flagInsecure, "insecure-skip-tls-verify", false, "skip TLS verification (env MIABI_INSECURE_SKIP_TLS_VERIFY)")
 	pf.StringVarP(&flagWorkspace, "workspace", "w", "", "workspace name or id (default: active/bound)")
 	pf.StringVarP(&flagOutput, "output", "o", "table", "output format: table | json | yaml")
 	pf.BoolVar(&flagJSON, "json", false, "shorthand for --output json")
@@ -80,11 +93,25 @@ func init() {
 
 // newClient resolves the connection context and returns an API client.
 func newClient() (*api.Client, *config.Effective, error) {
-	eff, err := config.Resolve(flagURL, flagToken)
+	eff, err := config.Resolve(config.Flags{
+		Context: flagContext, Server: serverFlag(), Token: flagToken, CA: flagCA, InsecureSkip: flagInsecure,
+	})
 	if err != nil {
 		return nil, nil, err
 	}
-	return api.New(eff.URL, eff.Token, flagVerbose), eff, nil
+	// Skipping TLS verification is a foot-gun that persists in a context, so warn
+	// loudly on every use (to stderr; suppressed for structured output so it never
+	// corrupts a machine-readable stream).
+	if eff.InsecureSkip && !structured() {
+		ui.Warn("TLS verification disabled for %s — this connection can be intercepted.", eff.URL)
+	}
+	c, err := api.New(api.Options{
+		BaseURL: eff.URL, Token: eff.Token, CAFile: eff.CA, InsecureSkip: eff.InsecureSkip, Verbose: flagVerbose,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return c, eff, nil
 }
 
 // workspaceRef resolves the workspace name (handle) the API addresses by for the

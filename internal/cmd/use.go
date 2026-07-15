@@ -32,9 +32,11 @@ var useCmd = &cobra.Command{
 		}
 
 		if useClear {
-			f.App = nil
-			if err := config.Save(f); err != nil {
-				return err
+			if cur := f.CurrentContext(); cur != nil && cur.App != nil {
+				cur.App = nil
+				if err := config.Save(f); err != nil {
+					return err
+				}
 			}
 			ui.Success("Cleared the current app")
 			return nil
@@ -42,14 +44,15 @@ var useCmd = &cobra.Command{
 
 		// No arg: report the current binding.
 		if len(args) == 0 {
-			if f.App == nil {
+			cur := f.CurrentContext()
+			if cur == nil || cur.App == nil {
 				ui.Info("No app bound. Bind one with `miabi use <app>`.")
 				return nil
 			}
 			if structured() {
-				return emit(f.App)
+				return emit(cur.App)
 			}
-			ui.Info("Current app: %s", ui.Bold(f.App.Name))
+			ui.Info("Current app: %s", ui.Bold(cur.App.Name))
 			return nil
 		}
 
@@ -70,7 +73,7 @@ var useCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		f.App = &config.AppRef{ID: app.ID, Name: app.Name, DisplayName: app.DisplayName}
+		f.EnsureCurrent().App = &config.AppRef{ID: app.ID, Name: app.Name, DisplayName: app.DisplayName}
 		if err := config.Save(f); err != nil {
 			return err
 		}

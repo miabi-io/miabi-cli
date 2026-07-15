@@ -5,8 +5,11 @@ package api
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -23,19 +26,47 @@ type Client struct {
 	verbose bool
 }
 
-// New builds a client for baseURL authenticating with token.
-func New(baseURL, token string, verbose bool) *Client {
+// Options configures a client: the server base URL, bearer token, TLS trust
+// (a custom CA bundle path and/or skip-verify), and verbose HTTP logging.
+type Options struct {
+	BaseURL      string
+	Token        string
+	CAFile       string
+	InsecureSkip bool
+	Verbose      bool
+}
+
+// New builds a client from o. It returns an error only when a configured CA
+// bundle cannot be read or parsed — a misconfigured trust root should fail loudly
+// rather than silently fall back to the system roots.
+func New(o Options) (*Client, error) {
+	tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: o.InsecureSkip} //nolint:gosec // opt-in via config
+	if o.CAFile != "" {
+		pem, err := os.ReadFile(o.CAFile)
+		if err != nil {
+			return nil, fmt.Errorf("read CA bundle %s: %w", o.CAFile, err)
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pem) {
+			return nil, fmt.Errorf("CA bundle %s contains no valid certificates", o.CAFile)
+		}
+		tlsCfg.RootCAs = pool
+	}
+	httpc := &http.Client{
+		Timeout:   30 * time.Second,
+		Transport: &http.Transport{TLSClientConfig: tlsCfg},
+	}
 	opts := []client.Option{
-		client.WithBearerToken(token),
+		client.WithHTTPClient(httpc),
+		client.WithBearerToken(o.Token),
 		client.WithUserAgent("miabi-cli/" + Version),
-		client.WithTimeout(30 * time.Second),
 		// Safe to retry: every call below is a GET or an idempotent action.
 		client.WithRetry(client.RetryPolicy{MaxAttempts: 3, BaseDelay: 200 * time.Millisecond, MaxDelay: 2 * time.Second}),
 	}
-	if verbose {
+	if o.Verbose {
 		opts = append(opts, client.WithMiddleware(client.LoggingMiddleware(os.Stderr)))
 	}
-	return &Client{c: client.New(baseURL, opts...), verbose: verbose}
+	return &Client{c: client.New(o.BaseURL, opts...), verbose: o.Verbose}, nil
 }
 
 // APIError is the server's structured error envelope.

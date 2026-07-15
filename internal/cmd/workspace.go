@@ -38,8 +38,10 @@ var workspaceListCmd = &cobra.Command{
 			return emit(ws)
 		}
 		active := ""
-		if f, ferr := config.Load(); ferr == nil && f.Workspace != nil {
-			active = f.Workspace.Name
+		if f, ferr := config.Load(); ferr == nil {
+			if cur := f.CurrentContext(); cur != nil && cur.Workspace != nil {
+				active = cur.Workspace.Name
+			}
 		}
 		t := ui.NewTable("", "NAME", "DISPLAY NAME", "ROLE")
 		for _, w := range ws {
@@ -62,20 +64,21 @@ var workspaceShowCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if f.Workspace == nil {
+		cur := f.CurrentContext()
+		if cur == nil || cur.Workspace == nil {
 			fmt.Println("No active workspace. Set one with `miabi workspace switch <name>`.")
 			return nil
 		}
 		if structured() {
-			return emit(f.Workspace)
+			return emit(cur.Workspace)
 		}
-		label := f.Workspace.Name
-		if f.Workspace.DisplayName != "" {
-			label = fmt.Sprintf("%s (%s)", f.Workspace.DisplayName, f.Workspace.Name)
+		label := cur.Workspace.Name
+		if cur.Workspace.DisplayName != "" {
+			label = fmt.Sprintf("%s (%s)", cur.Workspace.DisplayName, cur.Workspace.Name)
 		}
 		ui.Info("Active workspace: %s", ui.Bold(label))
-		if f.App != nil {
-			ui.Info("Current app: %s", ui.Bold(f.App.Name))
+		if cur.App != nil {
+			ui.Info("Current app: %s", ui.Bold(cur.App.Name))
 		}
 		return nil
 	},
@@ -102,10 +105,11 @@ var workspaceSwitchCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
-				f.Workspace = &config.WorkspaceRef{ID: w.ID, Name: w.Name, DisplayName: w.DisplayName}
+				cur := f.EnsureCurrent()
+				cur.Workspace = &config.WorkspaceRef{ID: w.ID, Name: w.Name, DisplayName: w.DisplayName}
 				// The bound app belongs to the old workspace — clear it so a stale
 				// app never leaks across a workspace switch.
-				f.App = nil
+				cur.App = nil
 				if err := config.Save(f); err != nil {
 					return err
 				}

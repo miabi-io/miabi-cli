@@ -49,14 +49,14 @@ miabi --version
 
 ```bash
 # check the connection
-docker run --rm -e MIABI_URL -e MIABI_TOKEN miabi/miabi-cli:latest whoami
+docker run --rm -e MIABI_SERVER -e MIABI_TOKEN miabi/miabi-cli:latest whoami
 
 # deploy from a pipeline — exits non-zero if the rollout fails
-docker run --rm -e MIABI_URL -e MIABI_TOKEN \
+docker run --rm -e MIABI_SERVER -e MIABI_TOKEN \
   miabi/miabi-cli:latest apps deploy web --tag "$GIT_SHA" --wait
 
 # mount a manifest to apply it declaratively
-docker run --rm -e MIABI_URL -e MIABI_TOKEN -v "$PWD:/work" -w /work \
+docker run --rm -e MIABI_SERVER -e MIABI_TOKEN -v "$PWD:/work" -w /work \
   miabi/miabi-cli:latest apply -f stack.yaml
 ```
 
@@ -65,23 +65,51 @@ docker run --rm -e MIABI_URL -e MIABI_TOKEN -v "$PWD:/work" -w /work \
 The CLI resolves its context as **flags → env → `~/.miabi/config.yaml`**:
 
 ```bash
-export MIABI_URL=https://miabi.example.com
+export MIABI_SERVER=https://miabi.example.com
 export MIABI_TOKEN=mb_…            # an API key with the `deploy` scope
 
 # …or persist it:
-miabi --url "$MIABI_URL" --token "$MIABI_TOKEN" login
+miabi --server "$MIABI_SERVER" --token "$MIABI_TOKEN" login
 ```
 
-`~/.miabi/config.yaml` (written by `login` / `workspace switch`, mode `0600`):
+`~/.miabi/config.yaml` (written by `login` / `workspace switch`, mode `0600`) holds
+one or more named **contexts** — each a server + token + bound workspace/app — and the
+active one:
 
 ```yaml
-url: https://miabi.example.com
-token: mb_…
-workspace:
-  id: 42
-  name: acme-prod
-  display_name: Acme Prod
+current: acme-prod
+contexts:
+  acme-prod:
+    server:
+      url: https://miabi.example.com
+      ca: /etc/ssl/miabi-ca.pem   # optional: trust a private CA
+      insecure_skip: false        # optional: skip TLS verification
+    token: mb_…
+    workspace: { id: 42, name: acme-prod, display_name: Acme Prod }
+  staging:
+    server: { url: https://staging.example.com }
+    token: mb_…
 ```
+
+### Contexts (switch between servers)
+
+`miabi login` writes a context (named by `--context`, else the server host). Switch
+between them, or target one for a single command:
+
+```bash
+miabi login --context prod    --server https://miabi.example.com --token mb_…
+miabi login --context staging --server https://staging.example.com --token mb_…
+
+miabi context ls              # list contexts (→ marks the current)
+miabi context use staging     # switch the active context
+miabi --context prod apps ls  # run one command against another context
+miabi context current         # print the active context name
+miabi context delete staging  # remove a context
+```
+
+TLS trust per context: `--certificate-authority <ca.pem>` (env `MIABI_CA`) and
+`--insecure-skip-tls-verify` (env `MIABI_INSECURE_SKIP_TLS_VERIFY`). Older flat/
+single-server config files are migrated into a `default` context automatically.
 
 ## Commands
 
@@ -202,7 +230,7 @@ hyphen-free name for anything referenced via dotted `{{ .secrets.<name> }}` /
     go install github.com/miabi-io/miabi-cli@latest
     miabi apps deploy web --tag "${{ github.sha }}" --wait
   env:
-    MIABI_URL:   ${{ vars.MIABI_URL }}
+    MIABI_SERVER:   ${{ vars.MIABI_SERVER }}
     MIABI_TOKEN: ${{ secrets.MIABI_DEPLOY_TOKEN }}
 ```
 
