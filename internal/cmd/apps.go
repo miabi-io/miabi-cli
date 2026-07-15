@@ -105,7 +105,7 @@ var appCreateCmd = &cobra.Command{
 
 		if appCreateUse {
 			if f, ferr := config.Load(); ferr == nil {
-				f.App = &config.AppRef{ID: app.ID, Name: app.Name, DisplayName: app.DisplayName}
+				f.EnsureCurrent().App = &config.AppRef{ID: app.ID, Name: app.Name, DisplayName: app.DisplayName}
 				_ = config.Save(f)
 			}
 		}
@@ -161,9 +161,11 @@ var appRmCmd = &cobra.Command{
 		}
 		// Clear the bound app if we just deleted it, so later commands don't
 		// resolve a dangling reference.
-		if f, ferr := config.Load(); ferr == nil && f.App != nil && f.App.ID == appID {
-			f.App = nil
-			_ = config.Save(f)
+		if f, ferr := config.Load(); ferr == nil {
+			if cur := f.CurrentContext(); cur != nil && cur.App != nil && cur.App.ID == appID {
+				cur.App = nil
+				_ = config.Save(f)
+			}
 		}
 		if structured() {
 			return emit(map[string]any{"deleted": true, "app": appRef})
