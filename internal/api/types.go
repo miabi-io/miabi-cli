@@ -22,6 +22,14 @@ type Me struct {
 	} `json:"auth"`
 }
 
+// LoginToken is the minted CLI token returned by the login-token claim endpoint
+// (the browser hands off a single-use code; this is what it exchanges to).
+type LoginToken struct {
+	Token     string `json:"token"`
+	ServerURL string `json:"server_url"`
+	ExpiresAt string `json:"expires_at"`
+}
+
 // Workspace is one entry of GET /api/v1/workspaces. Name is the unique handle;
 // DisplayName is the free-text label.
 type Workspace struct {
