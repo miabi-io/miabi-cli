@@ -158,6 +158,15 @@ func (c *Client) Me(ctx context.Context) (*Me, error) {
 	return &m, c.get(ctx, "/api/v1/me", &m)
 }
 
+// ClaimLoginToken exchanges a single-use hand-off code (delivered to the CLI's
+// loopback callback by the browser login flow) for the minted token. The
+// endpoint is public — the code is itself the short-lived, one-time credential —
+// so this works on a client built without a token.
+func (c *Client) ClaimLoginToken(ctx context.Context, code string) (*LoginToken, error) {
+	var t LoginToken
+	return &t, c.post(ctx, "/api/v1/auth/login-token/claim", map[string]string{"handoff": code}, &t)
+}
+
 func (c *Client) Workspaces(ctx context.Context) ([]Workspace, error) {
 	var ws []Workspace
 	return ws, c.get(ctx, "/api/v1/workspaces", &ws)
