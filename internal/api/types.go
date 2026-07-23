@@ -43,13 +43,14 @@ type Workspace struct {
 // App is an application listing/detail (only the fields the CLI surfaces). Name
 // is the unique handle; DisplayName is the free-text label.
 type App struct {
-	ID               uint   `json:"id"`
-	Name             string `json:"name"`
-	DisplayName      string `json:"display_name"`
-	Image            string `json:"image"`
-	Tag              string `json:"tag"`
-	Status           string `json:"status"`
-	CurrentReleaseID *uint  `json:"current_release_id"`
+	ID               uint      `json:"id"`
+	Name             string    `json:"name"`
+	DisplayName      string    `json:"display_name"`
+	Image            string    `json:"image"`
+	Tag              string    `json:"tag"`
+	Status           string    `json:"status"`
+	CurrentReleaseID *uint     `json:"current_release_id"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 // CreateAppRequest is the body of POST .../apps (only the common fields the CLI
