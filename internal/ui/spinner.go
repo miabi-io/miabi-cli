@@ -33,20 +33,24 @@ func (s *Spinner) Start() {
 	s.done = make(chan struct{})
 	go func() {
 		defer close(s.done)
-		t := time.NewTicker(90 * time.Millisecond)
+		t := time.NewTicker(80 * time.Millisecond)
 		defer t.Stop()
 		i := 0
+		draw := func() {
+			s.mu.Lock()
+			m := s.msg
+			s.mu.Unlock()
+			fmt.Fprintf(os.Stderr, "\r%s %s", Cyan(frames[i%len(frames)]), m)
+			i++
+		}
+		draw() // paint immediately so there's no blank gap before the first tick
 		for {
 			select {
 			case <-s.stop:
 				fmt.Fprint(os.Stderr, "\r\033[K") // clear the line
 				return
 			case <-t.C:
-				s.mu.Lock()
-				m := s.msg
-				s.mu.Unlock()
-				fmt.Fprintf(os.Stderr, "\r%s %s", Cyan(frames[i%len(frames)]), m)
-				i++
+				draw()
 			}
 		}
 	}()
