@@ -223,6 +223,53 @@ hyphen-free name for anything referenced via dotted `{{ .secrets.<name> }}` /
   when `NO_COLOR` is set.
 - `--verbose` logs every HTTP request to stderr.
 
+## AI agents (MCP)
+
+`miabi mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server so an
+AI agent (Claude Desktop, Claude Code, Cursor, …) can inspect and operate your panel. It
+turns each tool call into one authenticated `/api/v1` request — the agent inherits your
+token, workspace, and RBAC. **No model runs inside `miabi`;** you bring your own AI client.
+
+It exposes three MCP surfaces:
+
+- **Tools** — `list`/`get` apps, deployments, releases, databases, and secret *names*.
+  **Read-only by default**; `--allow-write` adds the mutating tools (`deploy_app`,
+  `restart_app`, `start_app`, `stop_app`, `rollback_app`), annotated as destructive so
+  clients prompt before calling them. Secret *values* are never returned.
+- **Resources** — apps and deployments as `miabi://workspaces/{ws}/apps/{app}[/deployments/{n}]`
+  URIs an agent can attach as context.
+- **Prompts** — ready-made diagnostics: `diagnose_deployment`, `app_health`,
+  `workspace_overview`.
+
+Transport is **stdio** by default; pass `--http 127.0.0.1:8765` to serve over HTTP instead
+(loopback-only origins are enforced to prevent DNS-rebinding).
+
+```bash
+# Register with Claude Code (read-only), using your current login/context:
+claude mcp add miabi -- miabi mcp
+
+# Allow the agent to deploy, restart and roll back:
+claude mcp add miabi -- miabi mcp --allow-write
+```
+
+For **Claude Desktop**, add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "miabi": {
+      "command": "miabi",
+      "args": ["mcp"],
+      "env": { "MIABI_SERVER": "https://panel.example.com", "MIABI_TOKEN": "…" }
+    }
+  }
+}
+```
+
+The server picks up the same connection config as every other command (`--server`/`--token`
+flags, `MIABI_*` env, or a saved context), and defaults tool calls to your active workspace
+when the agent doesn't name one.
+
 ## CI example (GitHub Actions)
 
 ```yaml
