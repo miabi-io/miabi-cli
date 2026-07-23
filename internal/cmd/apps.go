@@ -200,13 +200,13 @@ var appLsCmd = &cobra.Command{
 		if eff.App != nil {
 			bound = eff.App.Name
 		}
-		t := ui.NewTable("", "NAME", "IMAGE", "TAG", "STATUS")
+		t := ui.NewTable("", "NAME", "IMAGE", "TAG", "STATUS", "AGE")
 		for _, a := range apps {
 			marker := " "
 			if a.Name == bound {
 				marker = ui.Cyan("→")
 			}
-			t.Row(marker, a.Name, a.Image, a.Tag, ui.Status(a.Status))
+			t.Row(marker, a.Name, a.Image, a.Tag, ui.Status(a.Status), ui.Age(a.CreatedAt))
 		}
 		t.Print()
 		return nil

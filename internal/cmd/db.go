@@ -106,9 +106,9 @@ var dbLsCmd = &cobra.Command{
 		if structured() {
 			return emit(dbs)
 		}
-		t := ui.NewTable("NAME", "ENGINE", "VERSION", "STATUS", "ADDRESS", "SIZE")
+		t := ui.NewTable("NAME", "ENGINE", "VERSION", "STATUS", "ADDRESS", "SIZE", "AGE")
 		for _, d := range dbs {
-			t.Row(d.Name, d.Engine, d.Version, ui.Status(d.Status), fmt.Sprintf("%s:%d", d.Host, d.Port), humanBytes(d.SizeBytes))
+			t.Row(d.Name, d.Engine, d.Version, ui.Status(d.Status), fmt.Sprintf("%s:%d", d.Host, d.Port), humanBytes(d.SizeBytes), ui.Age(d.CreatedAt))
 		}
 		t.Print()
 		return nil
