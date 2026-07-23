@@ -152,46 +152,77 @@ func (t *Table) Row(cells ...any) {
 	t.rows = append(t.rows, r)
 }
 
-// Render writes the aligned table to w.
+// Render writes the aligned table to w. Column widths are measured by on-screen
+// width — ANSI color codes and multi-byte runes are counted as they render, not
+// by raw byte length
 func (t *Table) Render(w io.Writer) {
 	widths := make([]int, len(t.headers))
 	for i, h := range t.headers {
-		widths[i] = len(h)
+		widths[i] = visibleWidth(h)
 	}
 	for _, r := range t.rows {
 		for i, c := range r {
-			if i < len(widths) && len(c) > widths[i] {
-				widths[i] = len(c)
+			if i < len(widths) {
+				if vw := visibleWidth(c); vw > widths[i] {
+					widths[i] = vw
+				}
 			}
 		}
 	}
-	// Header (dimmed).
 	var b strings.Builder
+	// Header (dimmed).
+	var line strings.Builder
 	for i, h := range t.headers {
-		b.WriteString(pad(h, widths[i], i == len(t.headers)-1))
+		line.WriteString(pad(h, widths[i], i == len(t.headers)-1))
 	}
-	fmt.Fprintln(w, Dim(strings.TrimRight(b.String(), " ")))
+	b.WriteString(Dim(strings.TrimRight(line.String(), " ")))
+	b.WriteByte('\n')
 	for _, r := range t.rows {
-		b.Reset()
+		line.Reset()
 		for i, c := range r {
-			last := i == len(t.headers)-1
-			b.WriteString(pad(c, widths[i], last))
+			line.WriteString(pad(c, widths[i], i == len(t.headers)-1))
 		}
-		fmt.Fprintln(w, strings.TrimRight(b.String(), " "))
+		b.WriteString(strings.TrimRight(line.String(), " "))
+		b.WriteByte('\n')
 	}
+	fmt.Fprint(w, b.String())
 }
 
 // Print renders the table to stdout.
 func (t *Table) Print() { t.Render(os.Stdout) }
 
+// pad right-pads s to on-screen width w (never the last column) plus a two-space
+// gutter, using visibleWidth so color codes don't inflate the count.
 func pad(s string, w int, last bool) string {
 	if last {
 		return s
 	}
-	if len(s) < w {
-		s += strings.Repeat(" ", w-len(s))
+	if vw := visibleWidth(s); vw < w {
+		s += strings.Repeat(" ", w-vw)
 	}
 	return s + "  "
+}
+
+// visibleWidth returns the on-screen column width of s: ANSI SGR escape sequences
+// (color codes) are zero-width, and every other rune counts as one column. The
+// CLI's cell content is ASCII plus a few width-1 glyphs (→ ✓ ✗), so a rune count
+// is the rendered width — no wide-rune table needed.
+func visibleWidth(s string) int {
+	width, inEscape := 0, false
+	for _, r := range s {
+		switch {
+		case inEscape:
+			// A CSI sequence ends at its final byte (a letter in @A–Z / a–z).
+			if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') {
+				inEscape = false
+			}
+		case r == '\033':
+			inEscape = true
+		default:
+			width++
+		}
+	}
+	return width
 }
 
 // --- confirm ---------------------------------------------------------------
