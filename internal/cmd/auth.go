@@ -228,17 +228,60 @@ func randomState() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
-// writeCallbackPage renders the tiny page the browser lands on after the redirect
-// back to the loopback callback.
+// miabiMark is the Miabi logo, inlined so the callback page is fully
+// self-contained — it is served from 127.0.0.1 and must render with no network.
+const miabiMark = `<svg viewBox="0 0 1024 1024" width="56" height="56" aria-hidden="true">` +
+	`<defs><linearGradient id="g" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">` +
+	`<stop offset="0" stop-color="#c084fc"/><stop offset=".33" stop-color="#a855f7"/>` +
+	`<stop offset=".68" stop-color="#9333ea"/><stop offset="1" stop-color="#7e22ce"/></linearGradient></defs>` +
+	`<g transform="rotate(0 512 512)"><path d="M 486 168 C 416 166 306 168 326 168 C 226 168 168 226 168 326 L 168 354 C 168 454 226 486 326 486 L 354 486 C 416 486 458 458 472 472 C 458 458 486 416 486 354 L 486 168 Z" fill="url(#g)"/></g>` +
+	`<g transform="rotate(90 512 512)"><path d="M 486 168 C 416 166 306 168 326 168 C 226 168 168 226 168 326 L 168 354 C 168 454 226 486 326 486 L 354 486 C 416 486 458 458 472 472 C 458 458 486 416 486 354 L 486 168 Z" fill="url(#g)" opacity=".85"/></g>` +
+	`<g transform="rotate(180 512 512)"><path d="M 486 168 C 416 166 306 168 326 168 C 226 168 168 226 168 326 L 168 354 C 168 454 226 486 326 486 L 354 486 C 416 486 458 458 472 472 C 458 458 486 416 486 354 L 486 168 Z" fill="url(#g)" opacity=".7"/></g>` +
+	`<g transform="rotate(270 512 512)"><path d="M 486 168 C 416 166 306 168 326 168 C 226 168 168 226 168 326 L 168 354 C 168 454 226 486 326 486 L 354 486 C 416 486 458 458 472 472 C 458 458 486 416 486 354 L 486 168 Z" fill="url(#g)" opacity=".55"/></g>` +
+	`</svg>`
+
+// callbackPage is the branded page the browser lands on after the loopback
+// redirect. Self-contained (inline SVG + CSS, no external assets) and
+// light/dark aware, since it is served by the CLI itself over 127.0.0.1.
+const callbackPage = `<!doctype html><html lang="en"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Miabi CLI</title>
+<style>
+:root{--bg:#f8fafc;--card:#fff;--fg:#0f172a;--muted:#64748b;--line:#e2e8f0;--ok:#16a34a;--err:#dc2626}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1120;--card:#111827;--fg:#e5e7eb;--muted:#94a3b8;--line:#1f2937}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--bg);
+font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--fg)}
+.card{width:100%%;max-width:420px;background:var(--card);border:1px solid var(--line);border-radius:16px;
+padding:36px 32px;text-align:center;box-shadow:0 10px 30px rgba(2,6,23,.08)}
+.icon{width:56px;height:56px;margin:18px auto 0;border-radius:50%%;display:grid;place-items:center;
+background:color-mix(in srgb,var(--accent) 14%%,transparent);color:var(--accent)}
+.icon svg{width:32px;height:32px;stroke:currentColor;stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round}
+h1{margin:18px 0 6px;font-size:19px}
+p{margin:0;color:var(--muted);font-size:14px;line-height:1.6}
+.hint{margin-top:22px;padding-top:16px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+</style>
+<body><div class="card">%s<div class="icon" style="--accent:%s">%s</div>
+<h1>%s</h1><p>%s</p><div class="hint">%s</div></div></body></html>`
+
+// writeCallbackPage renders the page the browser lands on after the redirect back
+// to the loopback callback — a branded success (or failure) confirmation.
 func writeCallbackPage(w http.ResponseWriter, success bool) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	msg := "You can close this window and return to your terminal."
+	const check = `<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>`
+	const cross = `<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>`
+
+	accent, icon := "var(--ok)", check
+	title := "You're signed in"
+	body := "The Miabi CLI has captured your credentials. You can close this window and return to your terminal."
+	hint := "Try <code>miabi whoami</code> to confirm."
 	if !success {
-		msg = "Sign-in failed. Return to your terminal and try again."
+		accent, icon = "var(--err)", cross
+		title = "Sign-in failed"
+		body = "The Miabi CLI could not complete sign-in. Return to your terminal and try again."
+		hint = "Re-run <code>miabi login</code> to start over."
 	}
-	fmt.Fprintf(w, "<!doctype html><meta charset=utf-8><title>Miabi CLI</title>"+
-		"<body style=\"font-family:system-ui,sans-serif;text-align:center;padding:3rem;color:#334155\">"+
-		"<h2>Miabi CLI</h2><p>%s</p></body>", msg)
+	fmt.Fprintf(w, callbackPage, miabiMark, accent, icon, title, body, hint)
 }
 
 // firstNonEmpty returns the first non-empty string.

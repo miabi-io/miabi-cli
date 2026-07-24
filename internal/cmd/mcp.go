@@ -64,8 +64,6 @@ var mcpCmd = &cobra.Command{
 			FallbackWorkspace: fallbackWS,
 			AllowWrite:        mcpAllowWrite,
 			Version:           version,
-			// On stdio, stdout is the protocol channel; diagnostics must go to
-			// stderr. (Over HTTP, stdout is free, but stderr stays fine.)
 			Logf: func(format string, args ...any) {
 				cmd.PrintErrf(format+"\n", args...)
 			},
